@@ -109,7 +109,6 @@ await ln.webhooks.delete("webhook_id");
 ## Keys — `ln.keys`
 
 ```typescript
-const keys = await ln.keys.list();         // metadata only, not actual keys
 const newKey = await ln.keys.rotate(0);    // 0 = primary, 1 = secondary
 // → { key: string } — shown once
 ```
@@ -130,6 +129,33 @@ const ln = new LnBot(); // no auth needed
 const { primaryKey, secondaryKey } = await ln.restore.recovery({
   passphrase: "word1 word2 ... word12"
 });
+```
+
+## L402 — `ln.l402`
+
+```typescript
+// Create challenge (server side)
+const challenge = await ln.l402.createChallenge({
+  amount: 100,                    // sats
+  description: "API access",     // optional — embedded in invoice
+  expirySeconds: 3600,           // optional — adds expiry caveat
+  caveats: ["tier=pro"],         // optional — custom caveats (max 10)
+});
+// → { macaroon, invoice, paymentHash, expiresAt, wwwAuthenticate }
+
+// Pay challenge (client side)
+const result = await ln.l402.pay({
+  wwwAuthenticate: "L402 macaroon=\"...\", invoice=\"lnbc...\"",
+  maxFee: 10,                    // optional
+  reference: "order-42",         // optional
+  wait: true,                    // optional — wait for settlement (default true)
+  timeout: 60,                   // optional — max seconds to wait
+});
+// → { authorization, paymentHash, preimage, amount, fee, paymentNumber, status }
+
+// Verify token (server side, stateless)
+const v = await ln.l402.verify({ authorization: "L402 <macaroon>:<preimage>" });
+// → { valid: boolean, paymentHash, caveats, error }
 ```
 
 ## Errors

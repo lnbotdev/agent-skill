@@ -4,17 +4,18 @@ description: >-
   Lightning Network wallet infrastructure for AI agents. Use ln.bot to create
   wallets, send/receive Bitcoin over Lightning, generate invoices (BOLT11),
   manage Lightning addresses (*@ln.bot), check balances, rotate API keys,
-  configure webhooks, and set up MCP servers for payments. Trigger when the task
-  involves: Bitcoin payments, Lightning Network, sending or receiving sats,
-  creating wallets, invoices, BOLT11, Lightning addresses, balance checks, API
-  keys for payments, webhooks for payment notifications, MCP server config for
-  payments, or any mention of ln.bot. Do NOT trigger for on-chain
-  Bitcoin (L1), Ethereum, other blockchains, traditional payment processors,
-  or non-Lightning crypto.
+  configure webhooks, set up MCP servers for payments, and implement L402
+  paywalls. Trigger when the task involves: Bitcoin payments, Lightning Network,
+  sending or receiving sats, creating wallets, invoices, BOLT11, Lightning
+  addresses, balance checks, API keys for payments, webhooks for payment
+  notifications, MCP server config for payments, L402 paywalls, macaroons,
+  HTTP 402 payment-required flows, or any mention of ln.bot. Do NOT trigger for
+  on-chain Bitcoin (L1), Ethereum, other blockchains, traditional payment
+  processors, or non-Lightning crypto.
 license: MIT
 metadata:
   author: lnbotdev
-  version: "1.0"
+  version: "1.1"
   homepage: https://ln.bot
   repository: https://github.com/lnbotdev/agent-skill
 ---
@@ -172,6 +173,62 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 **SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming: `watch()` in TS/Python/Rust, `Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`.
 
 **Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
+
+**L402 (HTTP 402 paywalls):** Monetize APIs with Lightning-native authentication. Create challenges (invoice + macaroon), verify tokens statelessly, or pay challenges to get Authorization headers. All SDKs expose `ln.l402.createChallenge()`, `ln.l402.verify()`, and `ln.l402.pay()`.
+
+## L402 paywalls
+
+L402 lets you gate API access behind Lightning micropayments. The flow:
+
+1. **Server** creates a challenge → returns `WWW-Authenticate` header with macaroon + invoice
+2. **Client** pays the invoice → gets preimage (proof of payment)
+3. **Client** sends `Authorization: L402 <macaroon>:<preimage>` on subsequent requests
+4. **Server** verifies the token statelessly (signature + preimage + caveats)
+
+```typescript
+import { LnBot } from "@lnbot/sdk";
+
+// Server side — create a challenge
+const server = new LnBot({ apiKey: "key_server..." });
+const challenge = await server.l402.createChallenge({
+  amount: 100,
+  description: "API access",
+  expirySeconds: 3600,
+  caveats: ["tier=pro"],
+});
+// challenge.wwwAuthenticate → send as WWW-Authenticate header in 402 response
+
+// Client side — pay the challenge
+const client = new LnBot({ apiKey: "key_client..." });
+const result = await client.l402.pay({
+  wwwAuthenticate: challenge.wwwAuthenticate,
+});
+// result.authorization → send as Authorization header
+
+// Server side — verify the token
+const verification = await server.l402.verify({
+  authorization: result.authorization!,
+});
+// verification.valid, verification.caveats
+```
+
+```python
+from lnbot import LnBot
+
+# Server side
+server = LnBot(api_key="key_server...")
+challenge = server.l402.create_challenge(amount=100, description="API access", expiry_seconds=3600)
+# challenge.www_authenticate → send in 402 response
+
+# Client side
+client = LnBot(api_key="key_client...")
+result = client.l402.pay(www_authenticate=challenge.www_authenticate)
+# result.authorization → send as Authorization header
+
+# Server side — verify
+verification = server.l402.verify(authorization=result.authorization)
+# verification.valid
+```
 
 ## Pricing
 

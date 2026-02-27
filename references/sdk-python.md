@@ -120,7 +120,6 @@ ln.webhooks.delete("webhook_id")
 ## Keys — `ln.keys`
 
 ```python
-keys = ln.keys.list()              # metadata only
 new_key = ln.keys.rotate(0)        # slot 0 = primary, 1 = secondary
 # → str (the new key, shown once)
 ```
@@ -143,6 +142,33 @@ wallet = ln.restore.recovery("word1 word2 ... word12")
 
 session = ln.restore.passkey_begin()
 wallet = ln.restore.passkey_complete(session_id=session.session_id, assertion=cred)
+```
+
+## L402 — `ln.l402`
+
+```python
+# Create challenge (server side)
+challenge = ln.l402.create_challenge(
+    amount=100,                    # sats
+    description="API access",     # optional
+    expiry_seconds=3600,          # optional
+    caveats=["tier=pro"],         # optional (max 10)
+)
+# → .macaroon, .invoice, .payment_hash, .expires_at, .www_authenticate
+
+# Pay challenge (client side)
+result = ln.l402.pay(
+    www_authenticate='L402 macaroon="...", invoice="lnbc..."',
+    max_fee=10,                   # optional
+    reference="order-42",         # optional
+    wait=True,                    # optional (default True)
+    timeout=60,                   # optional
+)
+# → .authorization, .payment_hash, .preimage, .amount, .fee, .payment_number, .status
+
+# Verify token (server side, stateless)
+v = ln.l402.verify(authorization="L402 <macaroon>:<preimage>")
+# → .valid, .payment_hash, .caveats, .error
 ```
 
 ## Errors

@@ -143,7 +143,6 @@ client.webhooks().delete("webhook_id").await?;
 ## Keys — `client.keys()`
 
 ```rust
-let keys = client.keys().list().await?;
 let new_key = client.keys().rotate(0).await?;  // 0 = primary, 1 = secondary
 ```
 
@@ -159,6 +158,37 @@ let passphrase = client.backup().recovery().await?;  // 12-word BIP-39
 let client = LnBot::unauthenticated();
 let wallet = client.restore().recovery("word1 word2 ... word12").await?;
 // → .primary_key
+```
+
+## L402 — `client.l402()`
+
+```rust
+use lnbot::{CreateL402ChallengeRequest, PayL402Request, VerifyL402Request};
+
+// Create challenge (server side)
+let challenge = client.l402().create_challenge(&CreateL402ChallengeRequest {
+    amount: 100,
+    description: Some("API access".into()),
+    expiry_seconds: Some(3600),
+    caveats: Some(vec!["tier=pro".into()]),
+}).await?;
+// → .macaroon, .invoice, .payment_hash, .expires_at, .www_authenticate
+
+// Pay challenge (client side)
+let result = client.l402().pay(&PayL402Request {
+    www_authenticate: challenge.www_authenticate,
+    max_fee: Some(10),
+    reference: None,
+    wait: None,
+    timeout: None,
+}).await?;
+// → .authorization, .payment_hash, .preimage, .amount, .fee, .payment_number, .status
+
+// Verify token (server side, stateless)
+let v = client.l402().verify(&VerifyL402Request {
+    authorization: result.authorization.unwrap(),
+}).await?;
+// → .valid, .payment_hash, .caveats, .error
 ```
 
 ## Errors

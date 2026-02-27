@@ -130,7 +130,6 @@ err = client.Webhooks.Delete(ctx, "webhook_id")
 ## Keys — `client.Keys`
 
 ```go
-keys, err := client.Keys.List(ctx)
 newKey, err := client.Keys.Rotate(ctx, 0)  // 0 = primary, 1 = secondary
 ```
 
@@ -150,6 +149,32 @@ wallet, err := client.Restore.Recovery(ctx, &lnbot.RecoveryParams{
     Passphrase: "word1 word2 ... word12",
 })
 // → .PrimaryKey, .SecondaryKey
+```
+
+## L402 — `client.L402`
+
+```go
+// Create challenge (server side)
+challenge, err := client.L402.CreateChallenge(ctx, &lnbot.CreateL402ChallengeParams{
+    Amount:        100,
+    Description:   lnbot.Ptr("API access"),
+    ExpirySeconds: lnbot.Ptr(3600),
+    Caveats:       []string{"tier=pro"},
+})
+// → .Macaroon, .Invoice, .PaymentHash, .ExpiresAt, .WwwAuthenticate
+
+// Pay challenge (client side)
+result, err := client.L402.Pay(ctx, &lnbot.PayL402Params{
+    WwwAuthenticate: challenge.WwwAuthenticate,
+    MaxFee:          lnbot.Ptr(int64(10)),
+})
+// → .Authorization, .PaymentHash, .Preimage, .Amount, .Fee, .PaymentNumber, .Status
+
+// Verify token (server side, stateless)
+v, err := client.L402.Verify(ctx, &lnbot.VerifyL402Params{
+    Authorization: *result.Authorization,
+})
+// → .Valid, .PaymentHash, .Caveats, .Error
 ```
 
 ## Errors
