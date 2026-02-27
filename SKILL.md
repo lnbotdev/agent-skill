@@ -205,3 +205,4 @@ Applies to: `invoices.list`, `payments.list`, `transactions.list`.
 - [SDK reference](references/sdk-reference.md) — complete method signatures for all 4 SDKs
 - [CLI reference](references/cli-reference.md) — all commands, flags, config format
 - [Integration patterns](references/patterns.md) — common patterns and anti-patterns
+- [OpenAPI spec](https://api.ln.bot/openapi/v1.json) — full request/response schemas, status codes

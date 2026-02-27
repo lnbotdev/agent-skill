@@ -531,3 +531,7 @@ match client.invoices().get(999).await {
 | POST | `/v1/restore/passkey/complete` | Complete passkey restore |
 
 All endpoints use `Authorization: Bearer key_...` header except wallet creation and restore.
+
+Base URL: `https://api.ln.bot`
+
+Full OpenAPI spec: https://api.ln.bot/openapi/v1.json
