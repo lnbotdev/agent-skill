@@ -39,7 +39,10 @@ agent-skill/
 ├── README.md                     # This file
 ├── LICENSE                       # MIT
 └── references/
-    ├── sdk-reference.md          # Method signatures for all 4 SDKs
+    ├── sdk-typescript.md         # TypeScript SDK — @lnbot/sdk
+    ├── sdk-python.md             # Python SDK — lnbot (sync + async)
+    ├── sdk-go.md                 # Go SDK — github.com/lnbotdev/go-sdk
+    ├── sdk-rust.md               # Rust SDK — lnbot crate
     ├── cli-reference.md          # CLI commands and flags
     └── patterns.md               # Integration patterns and anti-patterns
 ```

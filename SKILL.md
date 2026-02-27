@@ -133,14 +133,27 @@ lnbot transactions
 Generate config for your AI agent:
 
 ```bash
-# Local (stdio) — uses npx
-lnbot mcp config
-
-# Remote (SSE) — direct API endpoint
+# Remote (streamable HTTP) — direct API endpoint
 lnbot mcp config --remote
 ```
 
 Paste the generated JSON into your AI agent's MCP config (Claude Desktop, Cursor, etc.).
+
+MCP endpoint: `https://api.ln.bot/mcp` (auth: Bearer token)
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `create_invoice` | Create Lightning invoice to receive sats. Returns bolt11, number, amount, expiry. |
+| `send_payment` | Send sats to Lightning address or BOLT11 invoice. Sends real money. |
+| `get_wallet` | Get balance, on-hold amount, available balance, and counts. |
+| `list_invoices` | List invoices (newest first), paginated. |
+| `list_payments` | List payments (newest first), paginated. |
+| `list_transactions` | List transaction history (newest first), paginated. |
+| `list_addresses` | List wallet's Lightning addresses. |
+
+Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP — use SDK or CLI for those.
 
 ## Core concepts
 
@@ -202,7 +215,10 @@ Applies to: `invoices.list`, `payments.list`, `transactions.list`.
 
 ## References
 
-- [SDK reference](references/sdk-reference.md) — complete method signatures for all 4 SDKs
+- [TypeScript SDK](references/sdk-typescript.md) — `@lnbot/sdk` complete API
+- [Python SDK](references/sdk-python.md) — `lnbot` complete API (sync + async)
+- [Go SDK](references/sdk-go.md) — `github.com/lnbotdev/go-sdk` complete API
+- [Rust SDK](references/sdk-rust.md) — `lnbot` crate complete API
 - [CLI reference](references/cli-reference.md) — all commands, flags, config format
 - [Integration patterns](references/patterns.md) — common patterns and anti-patterns
 - [OpenAPI spec](https://api.ln.bot/openapi/v1.json) — full request/response schemas, status codes
