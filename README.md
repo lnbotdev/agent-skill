@@ -2,7 +2,7 @@
 
 [Agent Skill](https://agentskills.io) for [ln.bot](https://ln.bot) — Lightning Network wallet infrastructure for AI agents.
 
-Teaches AI coding agents (Claude Code, Codex, Copilot, etc.) how to integrate ln.bot wallets, invoices, payments, Lightning addresses, and webhooks using any of the 4 SDKs, CLI, MCP, or REST API.
+Teaches AI coding agents (Claude Code, Codex, Copilot, etc.) how to integrate ln.bot wallets, invoices, payments, Lightning addresses, and webhooks using any of the 5 SDKs, CLI, MCP, or REST API.
 
 ## Install
 
@@ -43,6 +43,7 @@ agent-skill/
     ├── sdk-python.md             # Python SDK — lnbot (sync + async)
     ├── sdk-go.md                 # Go SDK — github.com/lnbotdev/go-sdk
     ├── sdk-rust.md               # Rust SDK — lnbot crate
+    ├── sdk-csharp.md             # C# SDK — LnBot NuGet package
     ├── cli-reference.md          # CLI commands and flags
     └── patterns.md               # Integration patterns and anti-patterns
 ```
@@ -54,5 +55,6 @@ agent-skill/
 - [Python SDK](https://github.com/lnbotdev/python-sdk) — `lnbot` on PyPI
 - [Go SDK](https://github.com/lnbotdev/go-sdk) — `github.com/lnbotdev/go-sdk`
 - [Rust SDK](https://github.com/lnbotdev/rust-sdk) — `lnbot` on crates.io
+- [C# SDK](https://github.com/lnbotdev/csharp-sdk) — `LnBot` on NuGet
 - [CLI](https://github.com/lnbotdev/cli) — `lnbot` command-line tool
 - [Agent Skills spec](https://agentskills.io/specification)

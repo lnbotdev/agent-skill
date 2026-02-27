@@ -32,6 +32,7 @@ Lightning wallet with CLI, MCP, and API — ready in seconds.
 | Python SDK | Python apps, async support | `pip install lnbot` |
 | Go SDK | Go services | `go get github.com/lnbotdev/go-sdk` |
 | Rust SDK | Rust services | `cargo add lnbot` |
+| C# SDK | .NET apps | `dotnet add package LnBot` |
 | CLI | Shell scripts, one-off ops | `brew install lnbotdev/tap/lnbot` |
 | MCP | AI agent tool calling | `lnbot mcp config` |
 | REST API | Any HTTP client | `curl https://api.ln.bot/v1/...` |
@@ -242,13 +243,13 @@ No monthly fees. No hidden costs.
 
 ## Error handling
 
-| HTTP | TypeScript | Python | Go | Rust |
-|------|-----------|--------|-----|------|
-| 400 | `BadRequestError` | `BadRequestError` | `*BadRequestError` | `LnBotError::BadRequest { body }` |
-| 401 | — | `UnauthorizedError` | `*UnauthorizedError` | — |
-| 404 | `NotFoundError` | `NotFoundError` | `*NotFoundError` | `LnBotError::NotFound { body }` |
-| 409 | `ConflictError` | `ConflictError` | `*ConflictError` | `LnBotError::Conflict { body }` |
-| base | `LnBotError` | `LnBotError` | `*APIError` | `LnBotError` |
+| HTTP | TypeScript | Python | Go | Rust | C# |
+|------|-----------|--------|-----|------|----|
+| 400 | `BadRequestError` | `BadRequestError` | `*BadRequestError` | `LnBotError::BadRequest { body }` | `BadRequestException` |
+| 401 | — | `UnauthorizedError` | `*UnauthorizedError` | — | `UnauthorizedException` |
+| 404 | `NotFoundError` | `NotFoundError` | `*NotFoundError` | `LnBotError::NotFound { body }` | `NotFoundException` |
+| 409 | `ConflictError` | `ConflictError` | `*ConflictError` | `LnBotError::Conflict { body }` | `ConflictException` |
+| base | `LnBotError` | `LnBotError` | `*APIError` | `LnBotError` | `LnBotException` |
 
 All errors carry `status` and `body`/`message` fields.
 
@@ -276,6 +277,7 @@ Applies to: `invoices.list`, `payments.list`, `transactions.list`.
 - [Python SDK](references/sdk-python.md) — `lnbot` complete API (sync + async)
 - [Go SDK](references/sdk-go.md) — `github.com/lnbotdev/go-sdk` complete API
 - [Rust SDK](references/sdk-rust.md) — `lnbot` crate complete API
+- [C# SDK](references/sdk-csharp.md) — `LnBot` NuGet package complete API
 - [CLI reference](references/cli-reference.md) — all commands, flags, config format
 - [Integration patterns](references/patterns.md) — common patterns and anti-patterns
 - [OpenAPI spec](https://api.ln.bot/openapi/v1.json) — full request/response schemas, status codes
