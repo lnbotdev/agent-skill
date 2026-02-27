@@ -1,5 +1,5 @@
 ---
-name: lnbot
+name: ln.bot
 description: >-
   Lightning Network wallet infrastructure for AI agents. Use ln.bot to create
   wallets, send/receive Bitcoin over Lightning, generate invoices (BOLT11),
@@ -8,7 +8,7 @@ description: >-
   involves: Bitcoin payments, Lightning Network, sending or receiving sats,
   creating wallets, invoices, BOLT11, Lightning addresses, balance checks, API
   keys for payments, webhooks for payment notifications, MCP server config for
-  payments, or any mention of ln.bot or lnbot. Do NOT trigger for on-chain
+  payments, or any mention of ln.bot. Do NOT trigger for on-chain
   Bitcoin (L1), Ethereum, other blockchains, traditional payment processors,
   or non-Lightning crypto.
 license: MIT

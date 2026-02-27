@@ -1,4 +1,4 @@
-# lnbot Agent Skill
+# ln.bot Agent Skill
 
 [Agent Skill](https://agentskills.io) for [ln.bot](https://ln.bot) — Lightning Network wallet infrastructure for AI agents.
 
