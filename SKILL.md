@@ -169,7 +169,7 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 **Recovery:** Every wallet has a 12-word BIP-39 passphrase. Store it securely — it's the only way to recover a wallet if keys are lost. Passkey (WebAuthn) backup also supported.
 
-**SSE streaming:** Watch invoice settlement in real-time instead of polling. All SDKs support streaming: `watch()` in TS/Python/Rust, `Watch()` with channels in Go.
+**SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming: `watch()` in TS/Python/Rust, `Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`.
 
 **Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
 

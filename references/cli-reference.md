@@ -63,18 +63,25 @@ lnbot balance                                 # Show available and on-hold amoun
 ```bash
 lnbot invoice create --amount 1000            # Create invoice for 1000 sats
 lnbot invoice create --amount 1000 --memo "Payment for task"
+lnbot invoice create --amount 1000 --no-wait  # Don't wait for payment
 lnbot invoice list                            # List invoices (alias: ls)
 lnbot invoice list --limit 50                 # Max results (default: 20)
 lnbot invoice list --after 42                 # Pagination cursor
 ```
+
+`invoice create` waits for settlement via SSE by default. Use `--no-wait` to return immediately.
 
 ### pay
 
 ```bash
 lnbot pay alice@ln.bot --amount 500           # Pay Lightning address
 lnbot pay lnbc1...                            # Pay BOLT11 invoice
+lnbot pay lnurl1... --amount 500              # Pay LNURL
 lnbot pay alice@ln.bot --amount 500 --max-fee 10  # Set max routing fee (sats)
+lnbot pay alice@ln.bot --amount 500 --no-wait # Don't wait for settlement
 ```
+
+Waits for settlement via SSE by default. Use `--no-wait` to return immediately.
 
 ### payment
 

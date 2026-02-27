@@ -55,12 +55,18 @@ for event in ln.invoices.watch(invoice.number, timeout=60):
 async for event in ln.invoices.watch(invoice.number):
     if event.event == "settled":
         break
+
+# Create invoice for a wallet (no auth required)
+inv = ln.invoices.create_for_wallet(wallet_id="wal_xxx", amount=1000)
+
+# Create invoice for a Lightning address (no auth required)
+inv = ln.invoices.create_for_address(address="alice@ln.bot", amount=1000)
 ```
 
 ## Payments — `ln.payments`
 
 ```python
-# Pay Lightning address
+# Pay Lightning address, LNURL, or BOLT11 invoice
 ln.payments.create(target="alice@ln.bot", amount=500)
 
 # Pay BOLT11 invoice
@@ -71,6 +77,18 @@ payments = ln.payments.list(limit=10, after="cursor")
 
 # Get
 payment = ln.payments.get("pay_number")
+
+# Watch (sync)
+for event in ln.payments.watch(payment.number, timeout=60):
+    if event.event == "settled":
+        break
+    if event.event == "failed":
+        raise Exception(event.data.failure_reason)
+
+# Watch (async)
+async for event in ln.payments.watch(payment.number):
+    if event.event == "settled":
+        break
 ```
 
 ## Addresses — `ln.addresses`

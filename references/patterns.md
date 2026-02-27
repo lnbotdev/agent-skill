@@ -51,7 +51,7 @@ def charge_for_task(amount_sats: int, memo: str):
 
 ## 2. Agent pays for external services
 
-Pay a BOLT11 invoice from an external service. Use `target` with the invoice string.
+Pay a BOLT11 invoice, Lightning address, or LNURL. Use `target` with the payment destination.
 
 ```typescript
 const ln = new LnBot({ apiKey: "key_..." });
@@ -61,6 +61,14 @@ await ln.payments.create({ target: "lnbc10u1pj..." });
 
 // Pay Lightning address with explicit amount
 await ln.payments.create({ target: "service@provider.com", amount: 1000 });
+
+// Pay LNURL
+await ln.payments.create({ target: "lnurl1...", amount: 1000 });
+
+// Wait for settlement
+for await (const event of ln.payments.watch(payment.number)) {
+  if (event.event === "settled") break;
+}
 ```
 
 ```python
@@ -71,6 +79,9 @@ ln.payments.create(target="lnbc10u1pj...")
 
 # Pay Lightning address
 ln.payments.create(target="service@provider.com", amount=1000)
+
+# Pay LNURL
+ln.payments.create(target="lnurl1...", amount=1000)
 ```
 
 ## 3. Webhook-driven backend
@@ -191,7 +202,7 @@ lnbot restore
 
 ## Anti-patterns
 
-**Don't poll for invoice status.** Use `watch()` / SSE streaming instead. Polling wastes resources and adds latency.
+**Don't poll for invoice or payment status.** Use `watch()` / SSE streaming instead. Polling wastes resources and adds latency.
 
 ```typescript
 // BAD — polling
@@ -201,8 +212,13 @@ while (true) {
   await sleep(1000);
 }
 
-// GOOD — SSE streaming
+// GOOD — SSE streaming (invoices)
 for await (const event of ln.invoices.watch(number)) {
+  if (event.event === "settled") break;
+}
+
+// GOOD — SSE streaming (payments)
+for await (const event of ln.payments.watch(number)) {
   if (event.event === "settled") break;
 }
 ```

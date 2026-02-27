@@ -50,14 +50,20 @@ for await (const event of ln.invoices.watch(number, timeout, signal)) {
   if (event.event === "settled") break;
   if (event.event === "expired") throw new Error("expired");
 }
+
+// Create invoice for a wallet (no auth required)
+const inv = await ln.invoices.createForWallet({ walletId: "wal_xxx", amount: 1000 });
+
+// Create invoice for a Lightning address (no auth required)
+const inv = await ln.invoices.createForAddress({ address: "alice@ln.bot", amount: 1000 });
 ```
 
-`watch()` params: `number: string`, `timeout?: number`, `signal?: AbortSignal`
+`watch()` params: `number: number`, `timeout?: number`, `signal?: AbortSignal`
 
 ## Payments — `ln.payments`
 
 ```typescript
-// Pay Lightning address
+// Pay Lightning address, LNURL, or BOLT11 invoice
 await ln.payments.create({ target: "alice@ln.bot", amount: 500 });
 
 // Pay BOLT11 invoice (amount encoded in invoice)
@@ -65,6 +71,12 @@ await ln.payments.create({ target: "lnbc1..." });
 
 // List
 const payments = await ln.payments.list({ limit: 10, after: "cursor" });
+
+// Watch for settlement (SSE stream — AsyncIterable)
+for await (const event of ln.payments.watch(number, timeout, signal)) {
+  if (event.event === "settled") break;
+  if (event.event === "failed") throw new Error(event.data.failureReason);
+}
 ```
 
 ## Addresses — `ln.addresses`

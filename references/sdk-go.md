@@ -57,15 +57,41 @@ for {
         log.Fatal(err)
     }
 }
+
+// Create invoice for a wallet (no auth required)
+inv, err := client.Invoices.CreateForWallet(ctx, &lnbot.CreateInvoiceForWalletParams{
+    WalletID: "wal_xxx",
+    Amount:   1000,
+})
+
+// Create invoice for a Lightning address (no auth required)
+inv, err := client.Invoices.CreateForAddress(ctx, &lnbot.CreateInvoiceForAddressParams{
+    Address: "alice@ln.bot",
+    Amount:  1000,
+})
 ```
 
 ## Payments — `client.Payments`
 
 ```go
+// Pay Lightning address, LNURL, or BOLT11 invoice
 _, err := client.Payments.Create(ctx, &lnbot.CreatePaymentParams{
     Target: "alice@ln.bot",          // string, required
     Amount: lnbot.Ptr(int64(500)),   // *int64, optional
 })
+
+// Watch (channel-based SSE)
+events, errs := client.Payments.Watch(ctx, payment.Number, nil)
+for {
+    select {
+    case event := <-events:
+        if event.Event == "settled" {
+            return
+        }
+    case err := <-errs:
+        log.Fatal(err)
+    }
+}
 ```
 
 ## Addresses — `client.Addresses`

@@ -63,14 +63,28 @@ while let Some(event) = stream.next().await {
 }
 ```
 
-`watch()` params: `invoice_number: u64`, `timeout: Option<Duration>`
+```rust
+// Create invoice for a wallet (no auth required)
+use lnbot::CreateInvoiceForWalletRequest;
+let inv = client.invoices().create_for_wallet(
+    &CreateInvoiceForWalletRequest::new("wal_xxx", 1000)
+).await?;
+
+// Create invoice for a Lightning address (no auth required)
+use lnbot::CreateInvoiceForAddressRequest;
+let inv = client.invoices().create_for_address(
+    &CreateInvoiceForAddressRequest::new("alice@ln.bot", 1000)
+).await?;
+```
+
+`watch()` params: `number: i32`, `timeout: Option<i32>`
 
 ## Payments — `client.payments()`
 
 ```rust
 use lnbot::CreatePaymentRequest;
 
-// Pay Lightning address (builder pattern)
+// Pay Lightning address, LNURL, or BOLT11 invoice (builder pattern)
 client.payments().create(
     &CreatePaymentRequest::new("alice@ln.bot").amount(500)
 ).await?;
@@ -79,6 +93,19 @@ client.payments().create(
 client.payments().create(
     &CreatePaymentRequest::new("lnbc1...")
 ).await?;
+
+// Watch (Stream-based SSE)
+use futures_util::StreamExt;
+use lnbot::PaymentEventType;
+
+let mut stream = client.payments().watch(payment.number, None);
+while let Some(event) = stream.next().await {
+    let event = event?;
+    if event.event == PaymentEventType::Settled {
+        println!("Payment complete!");
+        break;
+    }
+}
 ```
 
 ## Addresses — `client.addresses()`
@@ -159,7 +186,8 @@ match client.invoices().get(999).await {
 ```rust
 use lnbot::{
     LnBot, CreateWalletRequest, CreateInvoiceRequest,
-    CreatePaymentRequest, InvoiceEventType, LnBotError,
+    CreateInvoiceForWalletRequest, CreateInvoiceForAddressRequest,
+    CreatePaymentRequest, InvoiceEventType, PaymentEventType, LnBotError,
 };
 use futures_util::StreamExt;
 ```
