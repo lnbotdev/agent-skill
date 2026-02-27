@@ -34,64 +34,134 @@ Override path: `LNBOT_CONFIG` env var.
 
 ## Commands
 
-### Getting started
+### init
 
 ```bash
-lnbot init                         # Create local config file
+lnbot init                                    # Create local config file
 ```
 
-### Wallet management
+### wallet
 
 ```bash
-lnbot wallet create --name <name>  # Create new wallet
-lnbot wallet list                  # List wallets
-lnbot wallet switch                # Switch active wallet
-lnbot wallet rename                # Rename wallet
-lnbot wallet delete                # Delete wallet
+lnbot wallet create                           # Create wallet (name auto-generated)
+lnbot wallet create --name my-agent           # Create wallet with name
+lnbot wallet list                             # List wallets (alias: ls)
+lnbot wallet use <name|id>                    # Switch active wallet
+lnbot wallet rename <new-name>               # Rename active wallet
+lnbot wallet delete [name]                    # Remove wallet from config
+lnbot wallet delete [name] --force            # Skip confirmation
 ```
 
-### Money operations
+### balance
 
 ```bash
-lnbot balance                      # Show wallet balance
-lnbot invoice --amount <sats> --memo <text>  # Create invoice
-lnbot pay <recipient> --amount <sats>        # Pay address or BOLT11
-lnbot payment                      # List outgoing payments
-lnbot transactions                 # List all transactions
+lnbot balance                                 # Show available and on-hold amounts
 ```
 
-`<recipient>` is a Lightning address (`alice@ln.bot`) or BOLT11 invoice (`lnbc1...`).
-
-### Identity
+### invoice
 
 ```bash
-lnbot address                      # Manage Lightning addresses (buy, list, transfer, delete)
-lnbot whoami                       # Show current wallet info
-lnbot status                       # Wallet status and API health
+lnbot invoice create --amount 1000            # Create invoice for 1000 sats
+lnbot invoice create --amount 1000 --memo "Payment for task"
+lnbot invoice list                            # List invoices (alias: ls)
+lnbot invoice list --limit 50                 # Max results (default: 20)
+lnbot invoice list --after 42                 # Pagination cursor
 ```
 
-### Security
+### pay
 
 ```bash
-lnbot key                          # Show or rotate API keys
-lnbot backup                       # Generate recovery passphrase or register passkey
-lnbot restore                      # Restore wallet from passphrase or passkey
+lnbot pay alice@ln.bot --amount 500           # Pay Lightning address
+lnbot pay lnbc1...                            # Pay BOLT11 invoice
+lnbot pay alice@ln.bot --amount 500 --max-fee 10  # Set max routing fee (sats)
 ```
 
-### Integrations
+### payment
 
 ```bash
-lnbot webhook                      # Register, list, delete webhook endpoints
-lnbot mcp config                   # Generate MCP config (local/stdio)
-lnbot mcp config --remote          # Generate MCP config (remote/SSE)
+lnbot payment list                            # List outgoing payments (alias: ls)
+lnbot payment list --limit 50                 # Max results (default: 20)
+lnbot payment list --after 42                 # Pagination cursor
 ```
 
-### Shell completions
+### transactions
+
+```bash
+lnbot transactions                            # List all transactions (aliases: txns, tx)
+lnbot transactions --limit 50                 # Max results (default: 20)
+lnbot transactions --after 42                 # Pagination cursor
+```
+
+### address
+
+```bash
+lnbot address list                            # List Lightning addresses (alias: ls)
+lnbot address buy <name>                      # Buy vanity address → name@ln.bot
+lnbot address transfer <address> --to <wallet-name>        # Transfer to local wallet
+lnbot address transfer <address> --target-key <api-key>    # Transfer to external wallet
+lnbot address delete <address>                # Delete a Lightning address
+```
+
+### whoami / status
+
+```bash
+lnbot whoami                                  # Show current wallet info
+lnbot status                                  # Wallet status and API health
+```
+
+### key
+
+```bash
+lnbot key show                                # Show API keys from local config
+lnbot key rotate 0                            # Rotate primary key (slot 0)
+lnbot key rotate 1                            # Rotate secondary key (slot 1)
+```
+
+### backup
+
+```bash
+lnbot backup recovery                         # Generate 12-word recovery passphrase
+lnbot backup passkey                          # Register a passkey (browser)
+```
+
+### restore
+
+```bash
+lnbot restore recovery --passphrase "word1 word2 ... word12"
+lnbot restore passkey                         # Restore via passkey (browser)
+```
+
+### webhook
+
+```bash
+lnbot webhook create --url https://example.com/hook   # Register endpoint
+lnbot webhook list                            # List webhooks (alias: ls)
+lnbot webhook delete <id>                     # Delete webhook by ID
+```
+
+### mcp
+
+```bash
+lnbot mcp config --remote                     # Generate remote MCP config (streamable HTTP)
+lnbot mcp serve                               # Start local MCP server (coming soon)
+```
+
+Paste `mcp config` output into your AI agent's MCP settings (Claude Desktop, Cursor, Windsurf, etc.).
+
+### version / update
+
+```bash
+lnbot version                                 # Print version
+lnbot update                                  # Check for updates
+```
+
+### completion
 
 ```bash
 source <(lnbot completion bash)
 source <(lnbot completion zsh)
 lnbot completion fish | source
+lnbot completion powershell                   # PowerShell completions
 ```
 
 ## JSON output
@@ -100,10 +170,8 @@ All commands support `--json` for machine-readable output:
 
 ```bash
 lnbot balance --json
-# {"available": 42000}
-
-lnbot invoice --amount 1000 --json
-# {"bolt11": "lnbc1...", "number": "..."}
+lnbot invoice create --amount 1000 --json
+lnbot wallet list --json
 ```
 
 ## Multi-wallet
@@ -114,21 +182,3 @@ Use `-w` to target a specific wallet without switching:
 lnbot balance -w agent-1
 lnbot pay alice@ln.bot --amount 100 -w agent-2
 ```
-
-## MCP server
-
-The `lnbot mcp config` command generates JSON configuration for AI agent MCP clients.
-
-**Local (stdio) mode** — runs `npx @lnbot/mcp` as a subprocess:
-
-```bash
-lnbot mcp config
-```
-
-**Remote (SSE) mode** — connects directly to the ln.bot SSE endpoint:
-
-```bash
-lnbot mcp config --remote
-```
-
-Paste the output into your AI agent's MCP configuration file (Claude Desktop, Cursor, Windsurf, etc.).
