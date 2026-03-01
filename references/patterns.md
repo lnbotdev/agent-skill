@@ -198,6 +198,62 @@ lnbot restore
 # Follow prompts to enter passphrase
 ```
 
+## 8. Discover and pay L402 services
+
+Use [satring.com](https://satring.com) to find L402-enabled APIs, then pay with ln.bot.
+
+```typescript
+import { LnBot } from "@lnbot/sdk";
+
+const ln = new LnBot({ apiKey: "key_..." });
+
+// Discover services
+const res = await fetch("https://satring.com/api/v1/search?q=translation");
+const { services } = await res.json();
+const service = services[0]; // { name, url, pricing_sats, ... }
+
+// Hit the L402 endpoint
+const gatedRes = await fetch(`${service.url}/api/translate`, { method: "POST" });
+
+if (gatedRes.status === 402) {
+  const challenge = gatedRes.headers.get("www-authenticate")!;
+  const result = await ln.l402.pay({ wwwAuthenticate: challenge });
+
+  // Access with L402 token
+  const finalRes = await fetch(`${service.url}/api/translate`, {
+    method: "POST",
+    headers: { Authorization: result.authorization! },
+    body: JSON.stringify({ text: "hello", target: "es" }),
+  });
+}
+```
+
+```python
+import httpx
+from lnbot import LnBot
+
+ln = LnBot(api_key="key_...")
+
+# Discover services
+services = httpx.get("https://satring.com/api/v1/search?q=translation").json()["services"]
+service = services[0]
+
+# Hit the L402 endpoint
+response = httpx.post(f"{service['url']}/api/translate")
+
+if response.status_code == 402:
+    challenge = response.headers["www-authenticate"]
+    result = ln.l402.pay(www_authenticate=challenge)
+
+    final = httpx.post(
+        f"{service['url']}/api/translate",
+        headers={"Authorization": result.authorization},
+        json={"text": "hello", "target": "es"},
+    )
+```
+
+See [service-discovery.md](service-discovery.md) for the full satring.com API reference.
+
 ---
 
 ## Anti-patterns

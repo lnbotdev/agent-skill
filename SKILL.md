@@ -177,6 +177,8 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 **L402 (HTTP 402 paywalls):** Monetize APIs with Lightning-native authentication. Create challenges (invoice + macaroon), verify tokens statelessly, or pay challenges to get Authorization headers. All SDKs expose `ln.l402.createChallenge()`, `ln.l402.verify()`, and `ln.l402.pay()`.
 
+**Service discovery:** Find L402-enabled APIs to spend sats on via [satring.com](https://satring.com), an open directory of Lightning-paywalled services. Query `https://satring.com/api/v1/services` to browse by category, or `https://satring.com/api/v1/search?q=...` to search. Each listing includes the service URL, pricing in sats, protocol, ratings, and categories. Combine with `ln.l402.pay()` for a complete discover-then-pay workflow.
+
 ## L402 paywalls
 
 L402 lets you gate API access behind Lightning micropayments. The flow:
@@ -280,4 +282,5 @@ Applies to: `invoices.list`, `payments.list`, `transactions.list`.
 - [C# SDK](references/sdk-csharp.md) — `LnBot` NuGet package complete API
 - [CLI reference](references/cli-reference.md) — all commands, flags, config format
 - [Integration patterns](references/patterns.md) — common patterns and anti-patterns
+- [Service discovery](references/service-discovery.md) — find L402 APIs via satring.com
 - [OpenAPI spec](https://api.ln.bot/openapi/v1.json) — full request/response schemas, status codes
