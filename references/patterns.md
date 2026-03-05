@@ -7,16 +7,17 @@ Create invoice, wait for settlement, then execute the task.
 ```typescript
 import { LnBot } from "@lnbot/sdk";
 
-const ln = new LnBot({ apiKey: "key_..." });
+const ln = new LnBot({ apiKey: "uk_..." });
+const w = ln.wallet("wal_...");
 
 async function chargeForTask(amountSats: number, memo: string) {
   // Create invoice
-  const invoice = await ln.invoices.create({ amount: amountSats, memo });
+  const invoice = await w.invoices.create({ amount: amountSats, memo });
 
   // Share invoice.bolt11 with the payer
 
   // Wait for settlement (SSE — no polling)
-  for await (const event of ln.invoices.watch(invoice.number)) {
+  for await (const event of w.invoices.watch(invoice.number)) {
     if (event.event === "settled") {
       break;
     }
@@ -34,13 +35,14 @@ async function chargeForTask(amountSats: number, memo: string) {
 from lnbot import LnBot
 
 ln = LnBot(api_key="key_...")
+w = ln.wallet("wal_...")
 
 def charge_for_task(amount_sats: int, memo: str):
-    invoice = ln.invoices.create(amount=amount_sats, memo=memo)
+    invoice = w.invoices.create(amount=amount_sats, memo=memo)
 
     # Share invoice.bolt11 with the payer
 
-    for event in ln.invoices.watch(invoice.number):
+    for event in w.invoices.watch(invoice.number):
         if event.event == "settled":
             break
         if event.event == "expired":
@@ -54,34 +56,36 @@ def charge_for_task(amount_sats: int, memo: str):
 Pay a BOLT11 invoice, Lightning address, or LNURL. Use `target` with the payment destination.
 
 ```typescript
-const ln = new LnBot({ apiKey: "key_..." });
+const ln = new LnBot({ apiKey: "uk_..." });
+const w = ln.wallet("wal_...");
 
 // Pay BOLT11 invoice (amount encoded in invoice)
-await ln.payments.create({ target: "lnbc10u1pj..." });
+await w.payments.create({ target: "lnbc10u1pj..." });
 
 // Pay Lightning address with explicit amount
-await ln.payments.create({ target: "service@provider.com", amount: 1000 });
+await w.payments.create({ target: "service@provider.com", amount: 1000 });
 
 // Pay LNURL
-await ln.payments.create({ target: "lnurl1...", amount: 1000 });
+await w.payments.create({ target: "lnurl1...", amount: 1000 });
 
 // Wait for settlement
-for await (const event of ln.payments.watch(payment.number)) {
+for await (const event of w.payments.watch(payment.number)) {
   if (event.event === "settled") break;
 }
 ```
 
 ```python
 ln = LnBot(api_key="key_...")
+w = ln.wallet("wal_...")
 
 # Pay BOLT11 invoice
-ln.payments.create(target="lnbc10u1pj...")
+w.payments.create(target="lnbc10u1pj...")
 
 # Pay Lightning address
-ln.payments.create(target="service@provider.com", amount=1000)
+w.payments.create(target="service@provider.com", amount=1000)
 
 # Pay LNURL
-ln.payments.create(target="lnurl1...", amount=1000)
+w.payments.create(target="lnurl1...", amount=1000)
 ```
 
 ## 3. Webhook-driven backend
@@ -91,10 +95,11 @@ Register a webhook, then handle incoming POST notifications.
 ```typescript
 import { LnBot } from "@lnbot/sdk";
 
-const ln = new LnBot({ apiKey: "key_..." });
+const ln = new LnBot({ apiKey: "uk_..." });
+const w = ln.wallet("wal_...");
 
 // Register webhook (max 10 per wallet)
-const webhook = await ln.webhooks.create({ url: "https://example.com/hooks/lnbot" });
+const webhook = await w.webhooks.create({ url: "https://example.com/hooks/lnbot" });
 // Store webhook.secret for signature verification
 
 // In your HTTP handler:
@@ -108,8 +113,9 @@ app.post("/hooks/lnbot", (req, res) => {
 
 ```python
 ln = LnBot(api_key="key_...")
+w = ln.wallet("wal_...")
 
-webhook = ln.webhooks.create("https://example.com/hooks/lnbot")
+webhook = w.webhooks.create("https://example.com/hooks/lnbot")
 # Store webhook.secret for signature verification
 ```
 
@@ -120,22 +126,25 @@ A coordinator creates wallets and distributes funds to worker agents.
 ```typescript
 import { LnBot } from "@lnbot/sdk";
 
-// Coordinator creates wallets for agents
+// Coordinator registers an account and creates wallets for agents
 const unauthenticated = new LnBot();
-const agent1 = await unauthenticated.wallets.create({ name: "agent-1" });
-const agent2 = await unauthenticated.wallets.create({ name: "agent-2" });
+const account = await unauthenticated.register();
+const authed = new LnBot({ apiKey: account.primaryKey });
+const agent1 = await authed.wallets.create();
+const agent2 = await authed.wallets.create();
 
-// Store keys securely: agent1.primaryKey, agent1.recoveryPassphrase
-// Store keys securely: agent2.primaryKey, agent2.recoveryPassphrase
+// Store keys securely: account.primaryKey, account.recoveryPassphrase
 
 // Fund agents from coordinator wallet
-const coordinator = new LnBot({ apiKey: "key_coordinator..." });
-await coordinator.payments.create({ target: agent1.address, amount: 10000 });
-await coordinator.payments.create({ target: agent2.address, amount: 10000 });
+const coord = new LnBot({ apiKey: "key_coordinator..." });
+const cw = coord.wallet("wal_coordinator...");
+await cw.payments.create({ target: agent1.address, amount: 10000 });
+await cw.payments.create({ target: agent2.address, amount: 10000 });
 
 // Each agent operates independently
-const ln1 = new LnBot({ apiKey: agent1.primaryKey });
-const balance = await ln1.wallets.current();
+const ln1 = new LnBot({ apiKey: account.primaryKey });
+const w1 = ln1.wallet(agent1.walletId);
+const balance = await w1.get();
 ```
 
 ## 5. Zero-downtime key rotation
@@ -151,7 +160,8 @@ const newSecondary = await ln.keys.rotate(1);
 
 // Step 2: Verify new secondary works
 const test = new LnBot({ apiKey: newSecondary.key });
-await test.wallets.current(); // should succeed
+const tw = test.wallet("wal_...");
+await tw.get(); // should succeed
 
 // Step 3: Rotate primary key (index 0)
 const newPrimary = await ln.keys.rotate(0);
@@ -207,18 +217,18 @@ lnbot restore
 ```typescript
 // BAD — polling
 while (true) {
-  const inv = await ln.invoices.get(number);
+  const inv = await w.invoices.get(number);
   if (inv.status === "settled") break;
   await sleep(1000);
 }
 
 // GOOD — SSE streaming (invoices)
-for await (const event of ln.invoices.watch(number)) {
+for await (const event of w.invoices.watch(number)) {
   if (event.event === "settled") break;
 }
 
 // GOOD — SSE streaming (payments)
-for await (const event of ln.payments.watch(number)) {
+for await (const event of w.payments.watch(number)) {
   if (event.event === "settled") break;
 }
 ```

@@ -5,7 +5,7 @@ Edition: Rust 2021 | Async: `tokio` + `reqwest`
 
 ```toml
 [dependencies]
-lnbot = "0.1"
+lnbot = "1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -15,45 +15,65 @@ tokio = { version = "1", features = ["full"] }
 use lnbot::LnBot;
 
 let client = LnBot::unauthenticated();                            // no auth
-let client = LnBot::new("key_...");                               // authenticated
-let client = LnBot::new("key_...").with_base_url("https://...");  // custom URL
+let client = LnBot::new("uk_...");                                 // authenticated
+let client = LnBot::new("uk_...").with_base_url("https://...");    // custom URL
+```
+
+## Account — `client.*`
+
+```rust
+// Register (no auth)
+let account = client.register().await?;
+// → .primary_key, .recovery_passphrase
+
+// Identity
+let me = client.me().await?;
 ```
 
 ## Wallets — `client.wallets()`
 
 ```rust
-use lnbot::CreateWalletRequest;
+// Create
+let wallet = client.wallets().create().await?;
+// → .wallet_id, .address
 
-// Create (no auth required)
-let wallet = client.wallets().create(&CreateWalletRequest {
-    name: Some("my-agent".into()),  // Option<String>
-}).await?;
-// → .primary_key, .address, .recovery_passphrase, .available
-
-// Get current
-let wallet = client.wallets().current().await?;
-// → .available: i64 (sats)
+// List
+let wallets = client.wallets().list().await?;
 ```
 
-## Invoices — `client.invoices()`
+## Wallet handle — `client.wallet(id)`
+
+```rust
+let w = client.wallet("wal_...");
+
+// Get wallet info and balance
+let info = w.get().await?;
+// → .available: i64 (sats)
+
+// Update
+use lnbot::UpdateWalletRequest;
+w.update(&UpdateWalletRequest::new("new-name")).await?;
+```
+
+## Invoices — `w.invoices()`
 
 ```rust
 use lnbot::CreateInvoiceRequest;
 
 // Create (builder pattern)
-let invoice = client.invoices().create(
+let invoice = w.invoices().create(
     &CreateInvoiceRequest::new(1000).memo("Payment")
 ).await?;
 // → .bolt11: String, .number: u64
 
 // Get
-let invoice = client.invoices().get(invoice_id).await?;
+let invoice = w.invoices().get(invoice_number).await?;
 
-// Watch (Stream-based SSE)
+// Watch (Stream-based SSE, requires wk_)
 use futures_util::StreamExt;
 use lnbot::InvoiceEventType;
 
-let mut stream = client.invoices().watch(invoice.number, None);
+let mut stream = w.invoices().watch(invoice.number, None);
 while let Some(event) = stream.next().await {
     let event = event?;
     if event.event == InvoiceEventType::Settled {
@@ -77,28 +97,28 @@ let inv = client.invoices().create_for_address(
 ).await?;
 ```
 
-`watch()` params: `number: i32`, `timeout: Option<i32>`
-
-## Payments — `client.payments()`
+## Payments — `w.payments()`
 
 ```rust
 use lnbot::CreatePaymentRequest;
 
 // Pay Lightning address, LNURL, or BOLT11 invoice (builder pattern)
-client.payments().create(
+w.payments().create(
     &CreatePaymentRequest::new("alice@ln.bot").amount(500)
 ).await?;
 
 // Pay BOLT11 invoice
-client.payments().create(
+w.payments().create(
     &CreatePaymentRequest::new("lnbc1...")
 ).await?;
 
-// Watch (Stream-based SSE)
-use futures_util::StreamExt;
+// Resolve (inspect target before paying)
+let res = w.payments().resolve("alice@ln.bot").await?;
+
+// Watch (Stream-based SSE, requires wk_)
 use lnbot::PaymentEventType;
 
-let mut stream = client.payments().watch(payment.number, None);
+let mut stream = w.payments().watch(payment.number, None);
 while let Some(event) = stream.next().await {
     let event = event?;
     if event.event == PaymentEventType::Settled {
@@ -108,36 +128,60 @@ while let Some(event) = stream.next().await {
 }
 ```
 
-## Addresses — `client.addresses()`
+## Addresses — `w.addresses()`
 
 ```rust
-client.addresses().create(&CreateAddressRequest::default()).await?;       // random
-client.addresses().create(&CreateAddressRequest {
+w.addresses().create(&CreateAddressRequest::default()).await?;       // random
+w.addresses().create(&CreateAddressRequest {
     address: Some("alice".into()),
-}).await?;                                                                 // vanity
-let addrs = client.addresses().list().await?;
-client.addresses().delete("alice").await?;
-client.addresses().transfer("alice", &TransferAddressRequest {
-    target_wallet_key: "key_...".into(),
+}).await?;                                                            // vanity
+let addrs = w.addresses().list().await?;
+w.addresses().delete("alice").await?;
+w.addresses().transfer("alice", &TransferAddressRequest {
+    target_wallet_key: "wk_...".into(),
 }).await?;
 ```
 
-## Transactions — `client.transactions()`
+## Transactions — `w.transactions()`
 
 ```rust
-let txs = client.transactions().list(Some(50), None).await?;
+let txs = w.transactions().list(Some(50), None).await?;
 ```
 
-## Webhooks — `client.webhooks()`
+## Webhooks — `w.webhooks()`
 
 ```rust
-let webhook = client.webhooks().create(&CreateWebhookRequest {
+let webhook = w.webhooks().create(&CreateWebhookRequest {
     url: "https://example.com/hook".into(),
 }).await?;
 // → .id, .secret (shown once). Max 10 per wallet.
 
-let webhooks = client.webhooks().list().await?;
-client.webhooks().delete("webhook_id").await?;
+let webhooks = w.webhooks().list().await?;
+w.webhooks().delete("webhook_id").await?;
+```
+
+## Events — `w.events()`
+
+```rust
+// Stream all wallet events (SSE, requires wk_)
+let mut stream = w.events().stream();
+```
+
+## Wallet Key — `w.key()`
+
+```rust
+// Create (one key per wallet)
+let key = w.key().create().await?;
+// → .key ("wk_...") — shown once
+
+// Get metadata
+let info = w.key().get().await?;
+
+// Rotate (old key invalidated)
+let rotated = w.key().rotate().await?;
+
+// Delete
+w.key().delete().await?;
 ```
 
 ## Keys — `client.keys()`
@@ -160,13 +204,13 @@ let wallet = client.restore().recovery("word1 word2 ... word12").await?;
 // → .primary_key
 ```
 
-## L402 — `client.l402()`
+## L402 — `w.l402()`
 
 ```rust
 use lnbot::{CreateL402ChallengeRequest, PayL402Request, VerifyL402Request};
 
 // Create challenge (server side)
-let challenge = client.l402().create_challenge(&CreateL402ChallengeRequest {
+let challenge = w.l402().create_challenge(&CreateL402ChallengeRequest {
     amount: 100,
     description: Some("API access".into()),
     expiry_seconds: Some(3600),
@@ -175,7 +219,7 @@ let challenge = client.l402().create_challenge(&CreateL402ChallengeRequest {
 // → .macaroon, .invoice, .payment_hash, .expires_at, .www_authenticate
 
 // Pay challenge (client side)
-let result = client.l402().pay(&PayL402Request {
+let result = w.l402().pay(&PayL402Request {
     www_authenticate: challenge.www_authenticate,
     max_fee: Some(10),
     reference: None,
@@ -185,7 +229,7 @@ let result = client.l402().pay(&PayL402Request {
 // → .authorization, .payment_hash, .preimage, .amount, .fee, .payment_number, .status
 
 // Verify token (server side, stateless)
-let v = client.l402().verify(&VerifyL402Request {
+let v = w.l402().verify(&VerifyL402Request {
     authorization: result.authorization.unwrap(),
 }).await?;
 // → .valid, .payment_hash, .caveats, .error
@@ -196,7 +240,7 @@ let v = client.l402().verify(&VerifyL402Request {
 ```rust
 use lnbot::LnBotError;
 
-match client.invoices().get(999).await {
+match w.invoices().get(999).await {
     Ok(inv) => println!("{:?}", inv),
     Err(LnBotError::NotFound { body }) => eprintln!("not found: {body}"),
     Err(LnBotError::BadRequest { body }) => eprintln!("bad request: {body}"),
@@ -215,7 +259,7 @@ match client.invoices().get(999).await {
 
 ```rust
 use lnbot::{
-    LnBot, CreateWalletRequest, CreateInvoiceRequest,
+    LnBot, CreateInvoiceRequest,
     CreateInvoiceForWalletRequest, CreateInvoiceForAddressRequest,
     CreatePaymentRequest, InvoiceEventType, PaymentEventType, LnBotError,
 };
@@ -226,7 +270,8 @@ use futures_util::StreamExt;
 
 - All methods: **snake_case** (`wallets()`, `create`, `watch`)
 - All fields: **snake_case** (`primary_key`, `bolt11`)
-- Resources: method calls (`client.wallets()`, `client.invoices()`)
+- Account-level resources: `client.wallets()`, `client.invoices()`, `client.keys()`
+- Wallet-scoped resources: `w.invoices()`, `w.payments()`, `w.addresses()`, `w.l402()`
 - Optional fields: `Option<T>`
 - Request structs: builder pattern (`CreateInvoiceRequest::new(1000).memo("...")`)
 - Enums: typed (`InvoiceEventType::Settled`), `#[non_exhaustive]`

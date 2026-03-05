@@ -8,9 +8,10 @@ Runtime: .NET 8.0+ | Async-first | Zero dependencies (`System.Net.Http` + `Syste
 ```csharp
 using LnBot;
 
-new LnBotClient()                                      // no auth (wallet create/restore only)
-new LnBotClient("key_...")                              // authenticated
-new LnBotClient("key_...", new LnBotClientOptions
+new LnBotClient()                                      // no auth (register/restore/public invoices)
+new LnBotClient("uk_...")                               // authenticated (user key)
+new LnBotClient("wk_...")                               // authenticated (wallet key — for SSE)
+new LnBotClient("uk_...", new LnBotClientOptions
 {
     BaseUrl = "https://api.ln.bot",                     // optional — default shown
     Timeout = TimeSpan.FromSeconds(30),                 // optional
@@ -20,26 +21,46 @@ new LnBotClient("key_...", new LnBotClientOptions
 
 Implements `ILnBotClient` (for DI) and `IDisposable`.
 
+## Account — `client.*`
+
+```csharp
+// Register (no auth)
+var account = await client.RegisterAsync();
+// → .PrimaryKey, .RecoveryPassphrase
+
+// Identity
+var me = await client.MeAsync();
+```
+
 ## Wallets — `client.Wallets`
 
 ```csharp
-// Create (no auth required)
-var wallet = await client.Wallets.CreateAsync(new CreateWalletRequest { Name = "my-agent" });
-// → .PrimaryKey, .Address, .RecoveryPassphrase, .Available
+// Create
+var wallet = await client.Wallets.CreateAsync();
+// → .WalletId, .Address
 
-// Get current wallet
-var wallet = await client.Wallets.CurrentAsync();
+// List
+var wallets = await client.Wallets.ListAsync();
+```
+
+## Wallet handle — `client.Wallet(id)`
+
+```csharp
+var w = client.Wallet("wal_...");
+
+// Get wallet info and balance
+var info = await w.GetAsync();
 // → .Available (long, sats)
 
 // Update name
-await client.Wallets.UpdateAsync(new UpdateWalletRequest { Name = "new-name" });
+await w.UpdateAsync(new UpdateWalletRequest { Name = "new-name" });
 ```
 
-## Invoices — `client.Invoices`
+## Invoices — `w.Invoices`
 
 ```csharp
 // Create
-var invoice = await client.Invoices.CreateAsync(new CreateInvoiceRequest
+var invoice = await w.Invoices.CreateAsync(new CreateInvoiceRequest
 {
     Amount = 1000,
     Memo = "Payment",           // optional
@@ -48,25 +69,19 @@ var invoice = await client.Invoices.CreateAsync(new CreateInvoiceRequest
 // → .Bolt11, .Number
 
 // List (cursor-based pagination)
-var invoices = await client.Invoices.ListAsync(new PaginationParams { Limit = 10 });
+var invoices = await w.Invoices.ListAsync(new PaginationParams { Limit = 10 });
 
 // Get by number
-var invoice = await client.Invoices.GetAsync(1);
+var invoice = await w.Invoices.GetAsync(1);
 
 // Get by payment hash
-var invoice = await client.Invoices.GetByHashAsync("abc123...");
+var invoice = await w.Invoices.GetByHashAsync("abc123...");
 
-// Watch for settlement (SSE stream — IAsyncEnumerable)
-await foreach (var evt in client.Invoices.WatchAsync(invoice.Number))
+// Watch for settlement (SSE stream — IAsyncEnumerable, requires wk_)
+await foreach (var evt in w.Invoices.WatchAsync(invoice.Number))
 {
     if (evt.Event == "settled") break;
     if (evt.Event == "expired") throw new Exception("expired");
-}
-
-// Watch by payment hash
-await foreach (var evt in client.Invoices.WatchByHashAsync("abc123..."))
-{
-    if (evt.Event == "settled") break;
 }
 
 // Create invoice for a wallet (no auth required)
@@ -84,65 +99,92 @@ var inv = await client.Invoices.CreateForAddressAsync(new CreateInvoiceForAddres
 
 `WatchAsync()` params: `int number`, `int? timeout = null`, `CancellationToken`
 
-## Payments — `client.Payments`
+## Payments — `w.Payments`
 
 ```csharp
 // Pay Lightning address, LNURL, or BOLT11 invoice
-await client.Payments.CreateAsync(new CreatePaymentRequest
+await w.Payments.CreateAsync(new CreatePaymentRequest
 {
     Target = "alice@ln.bot",
     Amount = 500,
 });
 
 // Pay BOLT11 invoice (amount encoded in invoice)
-await client.Payments.CreateAsync(new CreatePaymentRequest { Target = "lnbc1..." });
+await w.Payments.CreateAsync(new CreatePaymentRequest { Target = "lnbc1..." });
 
 // List
-var payments = await client.Payments.ListAsync(new PaginationParams { Limit = 10 });
+var payments = await w.Payments.ListAsync(new PaginationParams { Limit = 10 });
 
 // Get by number or payment hash
-var payment = await client.Payments.GetAsync(1);
-var payment = await client.Payments.GetByHashAsync("abc123...");
+var payment = await w.Payments.GetAsync(1);
+var payment = await w.Payments.GetByHashAsync("abc123...");
 
-// Watch for settlement (SSE stream — IAsyncEnumerable)
-await foreach (var evt in client.Payments.WatchAsync(payment.Number))
+// Watch for settlement (SSE stream — IAsyncEnumerable, requires wk_)
+await foreach (var evt in w.Payments.WatchAsync(payment.Number))
 {
     if (evt.Event == "settled") break;
     if (evt.Event == "failed") throw new Exception(evt.Data.FailureReason);
 }
 ```
 
-## Addresses — `client.Addresses`
+## Addresses — `w.Addresses`
 
 ```csharp
-await client.Addresses.CreateAsync();                                                  // random
-await client.Addresses.CreateAsync(new CreateAddressRequest { Address = "alice" });    // vanity → alice@ln.bot
-var addresses = await client.Addresses.ListAsync();
-await client.Addresses.DeleteAsync("alice");
-await client.Addresses.TransferAsync("alice", new TransferAddressRequest
+await w.Addresses.CreateAsync();                                                  // random
+await w.Addresses.CreateAsync(new CreateAddressRequest { Address = "alice" });    // vanity → alice@ln.bot
+var addresses = await w.Addresses.ListAsync();
+await w.Addresses.DeleteAsync("alice");
+await w.Addresses.TransferAsync("alice", new TransferAddressRequest
 {
-    TargetWalletKey = "key_...",
+    TargetWalletKey = "wk_...",
 });
 ```
 
-## Transactions — `client.Transactions`
+## Transactions — `w.Transactions`
 
 ```csharp
-var txs = await client.Transactions.ListAsync(new PaginationParams { Limit = 50 });
+var txs = await w.Transactions.ListAsync(new PaginationParams { Limit = 50 });
 // Each: .Type (Credit/Debit), .Amount, .Note
 ```
 
-## Webhooks — `client.Webhooks`
+## Webhooks — `w.Webhooks`
 
 ```csharp
-var webhook = await client.Webhooks.CreateAsync(new CreateWebhookRequest
+var webhook = await w.Webhooks.CreateAsync(new CreateWebhookRequest
 {
     Url = "https://example.com/hook",
 });
 // → .Id, .Secret (shown once). Max 10 per wallet.
 
-var webhooks = await client.Webhooks.ListAsync();
-await client.Webhooks.DeleteAsync("webhook_id");
+var webhooks = await w.Webhooks.ListAsync();
+await w.Webhooks.DeleteAsync("webhook_id");
+```
+
+## Events — `w.Events`
+
+```csharp
+// Stream all wallet events (SSE, requires wk_)
+await foreach (var evt in w.Events.StreamAsync(cancellationToken))
+{
+    Console.WriteLine($"{evt.Event}: {evt.Data}");
+}
+```
+
+## Wallet Key — `w.Key`
+
+```csharp
+// Create (one key per wallet)
+var key = await w.Key.CreateAsync();
+// → .Key ("wk_...") — shown once
+
+// Get metadata
+var info = await w.Key.GetAsync();
+
+// Rotate (old key invalidated)
+var rotated = await w.Key.RotateAsync();
+
+// Delete
+await w.Key.DeleteAsync();
 ```
 
 ## Keys — `client.Keys`
@@ -176,11 +218,11 @@ var restored = await client.Restore.RecoveryAsync(new RecoveryRestoreRequest
 // → .PrimaryKey, .SecondaryKey
 ```
 
-## L402 — `client.L402`
+## L402 — `w.L402`
 
 ```csharp
 // Create challenge (server side)
-var challenge = await client.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
+var challenge = await w.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
 {
     Amount = 100,                          // sats
     Description = "API access",            // optional — embedded in invoice
@@ -190,7 +232,7 @@ var challenge = await client.L402.CreateChallengeAsync(new CreateL402ChallengeRe
 // → .Macaroon, .Invoice, .PaymentHash, .ExpiresAt, .WwwAuthenticate
 
 // Pay challenge (client side)
-var result = await client.L402.PayAsync(new PayL402Request
+var result = await w.L402.PayAsync(new PayL402Request
 {
     WwwAuthenticate = challenge.WwwAuthenticate,
     MaxFee = 10,                           // optional
@@ -201,7 +243,7 @@ var result = await client.L402.PayAsync(new PayL402Request
 // → .Authorization, .PaymentHash, .Preimage, .Amount, .Fee, .PaymentNumber, .Status
 
 // Verify token (server side, stateless)
-var v = await client.L402.VerifyAsync(new VerifyL402Request
+var v = await w.L402.VerifyAsync(new VerifyL402Request
 {
     Authorization = "L402 <macaroon>:<preimage>",
 });
@@ -215,7 +257,7 @@ using LnBot.Exceptions;
 
 try
 {
-    await client.Invoices.GetAsync(999);
+    await w.Invoices.GetAsync(999);
 }
 catch (NotFoundException ex)
 {
@@ -234,9 +276,10 @@ catch (NotFoundException ex)
 
 ## Conventions
 
-- All methods: **PascalCase** with `Async` suffix (`CreateAsync`, `CurrentAsync`, `WatchAsync`)
+- All methods: **PascalCase** with `Async` suffix (`CreateAsync`, `GetAsync`, `WatchAsync`)
 - All properties: **PascalCase** (`PrimaryKey`, `StatusCode`)
-- Resources: properties on the client (`client.Wallets`, `client.Invoices`)
+- Account-level resources: `client.Wallets`, `client.Invoices`, `client.Keys`
+- Wallet-scoped resources: `w.Invoices`, `w.Payments`, `w.Addresses`, `w.L402`
 - Optional fields: nullable types (`string?`, `long?`, `int?`)
 - All methods accept `CancellationToken` as last parameter
 - SSE streams: `IAsyncEnumerable<T>` via `await foreach`

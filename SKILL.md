@@ -42,29 +42,29 @@ Lightning wallet with CLI, MCP, and API — ready in seconds.
 ```typescript
 import { LnBot } from "@lnbot/sdk";
 
-// 1. Create wallet (no auth needed)
+// 1. Register (no auth needed)
 const ln = new LnBot();
-const wallet = await ln.wallets.create({ name: "my-agent" });
-// wallet.primaryKey, wallet.address, wallet.recoveryPassphrase
+const account = await ln.register();
 
-// 2. Authenticate
-const authed = new LnBot({ apiKey: wallet.primaryKey });
+// 2. Create wallet
+const authed = new LnBot({ apiKey: account.primaryKey });
+const wallet = await authed.wallets.create();
 
-// 3. Receive — create invoice
-const invoice = await authed.invoices.create({ amount: 1000, memo: "Task payment" });
-// invoice.bolt11, invoice.number
+// 3. Wallet operations
+const w = authed.wallet(wallet.walletId);
+const invoice = await w.invoices.create({ amount: 1000, memo: "Task payment" });
 
 // 4. Wait for payment (SSE stream)
-for await (const event of authed.invoices.watch(invoice.number)) {
+for await (const event of w.invoices.watch(invoice.number)) {
   if (event.event === "settled") break;
 }
 
 // 5. Send — pay someone
-await authed.payments.create({ target: "alice@ln.bot", amount: 500 });
+await w.payments.create({ target: "alice@ln.bot", amount: 500 });
 
 // 6. Check balance
-const current = await authed.wallets.current();
-console.log(current.available); // sats
+const info = await w.get();
+console.log(info.available); // sats
 ```
 
 ## Quick start — Python
@@ -72,28 +72,29 @@ console.log(current.available); // sats
 ```python
 from lnbot import LnBot
 
-# 1. Create wallet (no auth needed)
+# 1. Register (no auth needed)
 ln = LnBot()
-wallet = ln.wallets.create("my-agent")
-# wallet.primary_key, wallet.address, wallet.recovery_passphrase
+account = ln.register()
 
-# 2. Authenticate (or set LNBOT_API_KEY env var)
-ln = LnBot(api_key=wallet.primary_key)
+# 2. Create wallet
+ln = LnBot(api_key=account.primary_key)
+wallet = ln.wallets.create()
 
-# 3. Receive
-invoice = ln.invoices.create(amount=1000, memo="Task payment")
+# 3. Wallet operations
+w = ln.wallet(wallet.wallet_id)
+invoice = w.invoices.create(amount=1000, memo="Task payment")
 
 # 4. Wait for payment
-for event in ln.invoices.watch(invoice.number):
+for event in w.invoices.watch(invoice.number):
     if event.event == "settled":
         break
 
 # 5. Send
-ln.payments.create(target="alice@ln.bot", amount=500)
+w.payments.create(target="alice@ln.bot", amount=500)
 
 # 6. Check balance
-current = ln.wallets.current()
-print(current.available)
+info = w.get()
+print(info.available)
 ```
 
 Async variant:
@@ -101,9 +102,10 @@ Async variant:
 ```python
 from lnbot import AsyncLnBot
 
-async with AsyncLnBot(api_key="key_...") as ln:
-    invoice = await ln.invoices.create(amount=1000, memo="Task payment")
-    async for event in ln.invoices.watch(invoice.number):
+async with AsyncLnBot(api_key="uk_...") as ln:
+    w = ln.wallet("wal_...")
+    invoice = await w.invoices.create(amount=1000, memo="Task payment")
+    async for event in w.invoices.watch(invoice.number):
         if event.event == "settled":
             break
 ```
@@ -159,7 +161,7 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 ## Core concepts
 
-**Wallet-as-identity:** Each wallet is an autonomous identity with its own API keys, Lightning addresses, and balance. No user accounts — wallets are the primitive.
+**Wallet-as-identity:** Each wallet is an autonomous identity with its own Lightning addresses and balance. All wallet-level operations are scoped via `ln.wallet("wal_...")` — invoices, payments, L402, webhooks, etc. Account-level operations (register, create wallet, list wallets, rotate keys) stay on the client directly.
 
 **Two API keys:** Every wallet has a primary key (index 0) and secondary key (index 1). Both work for all operations. Rotate independently for zero-downtime key rotation.
 
@@ -171,11 +173,11 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 **Recovery:** Every wallet has a 12-word BIP-39 passphrase. Store it securely — it's the only way to recover a wallet if keys are lost. Passkey (WebAuthn) backup also supported.
 
-**SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming: `watch()` in TS/Python/Rust, `Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`.
+**SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming on the wallet scope: `w.invoices.watch()` in TS/Python/Rust, `w.Invoices.Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`.
 
 **Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
 
-**L402 (HTTP 402 paywalls):** Monetize APIs with Lightning-native authentication. Create challenges (invoice + macaroon), verify tokens statelessly, or pay challenges to get Authorization headers. All SDKs expose `ln.l402.createChallenge()`, `ln.l402.verify()`, and `ln.l402.pay()`.
+**L402 (HTTP 402 paywalls):** Monetize APIs with Lightning-native authentication. Create challenges (invoice + macaroon), verify tokens statelessly, or pay challenges to get Authorization headers. All SDKs expose L402 on the wallet scope: `w.l402.createChallenge()`, `w.l402.verify()`, and `w.l402.pay()`.
 
 ## L402 paywalls
 
@@ -190,8 +192,10 @@ L402 lets you gate API access behind Lightning micropayments. The flow:
 import { LnBot } from "@lnbot/sdk";
 
 // Server side — create a challenge
-const server = new LnBot({ apiKey: "key_server..." });
-const challenge = await server.l402.createChallenge({
+const ln = new LnBot({ apiKey: "key_server..." });
+const w = ln.wallet("wal_...");
+
+const challenge = await w.l402.createChallenge({
   amount: 100,
   description: "API access",
   expirySeconds: 3600,
@@ -201,13 +205,14 @@ const challenge = await server.l402.createChallenge({
 
 // Client side — pay the challenge
 const client = new LnBot({ apiKey: "key_client..." });
-const result = await client.l402.pay({
+const cw = client.wallet("wal_...");
+const result = await cw.l402.pay({
   wwwAuthenticate: challenge.wwwAuthenticate,
 });
 // result.authorization → send as Authorization header
 
 // Server side — verify the token
-const verification = await server.l402.verify({
+const verification = await w.l402.verify({
   authorization: result.authorization!,
 });
 // verification.valid, verification.caveats
@@ -217,17 +222,19 @@ const verification = await server.l402.verify({
 from lnbot import LnBot
 
 # Server side
-server = LnBot(api_key="key_server...")
-challenge = server.l402.create_challenge(amount=100, description="API access", expiry_seconds=3600)
+ln = LnBot(api_key="key_server...")
+w = ln.wallet("wal_...")
+challenge = w.l402.create_challenge(amount=100, description="API access", expiry_seconds=3600)
 # challenge.www_authenticate → send in 402 response
 
 # Client side
 client = LnBot(api_key="key_client...")
-result = client.l402.pay(www_authenticate=challenge.www_authenticate)
+cw = client.wallet("wal_...")
+result = cw.l402.pay(www_authenticate=challenge.www_authenticate)
 # result.authorization → send as Authorization header
 
 # Server side — verify
-verification = server.l402.verify(authorization=result.authorization)
+verification = w.l402.verify(authorization=result.authorization)
 # verification.valid
 ```
 
@@ -259,14 +266,16 @@ List endpoints use cursor-based pagination:
 
 ```typescript
 // TypeScript
-const page1 = await ln.invoices.list({ limit: 10 });
-const page2 = await ln.invoices.list({ limit: 10, after: lastId });
+const w = ln.wallet("wal_...");
+const page1 = await w.invoices.list({ limit: 10 });
+const page2 = await w.invoices.list({ limit: 10, after: lastId });
 ```
 
 ```python
 # Python
-page1 = ln.invoices.list(limit=10)
-page2 = ln.invoices.list(limit=10, after=last_id)
+w = ln.wallet("wal_...")
+page1 = w.invoices.list(limit=10)
+page2 = w.invoices.list(limit=10, after=last_id)
 ```
 
 Applies to: `invoices.list`, `payments.list`, `transactions.list`.
