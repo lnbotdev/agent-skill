@@ -22,7 +22,11 @@ async function chargeForTask(amountSats: number, memo: string) {
       break;
     }
     if (event.event === "expired") {
-      throw new Error("Invoice expired");
+      // An invoice paid just before it expired can still settle: re-check
+      await new Promise((r) => setTimeout(r, 60_000));
+      const latest = await w.invoices.get(invoice.number);
+      if (latest.status !== "settled") throw new Error("Invoice expired");
+      break;
     }
   }
 
@@ -32,9 +36,11 @@ async function chargeForTask(amountSats: number, memo: string) {
 ```
 
 ```python
+import time
+
 from lnbot import LnBot
 
-ln = LnBot(api_key="key_...")
+ln = LnBot(api_key="uk_...")
 w = ln.wallet("wal_...")
 
 def charge_for_task(amount_sats: int, memo: str):
@@ -46,7 +52,11 @@ def charge_for_task(amount_sats: int, memo: str):
         if event.event == "settled":
             break
         if event.event == "expired":
-            raise Exception("Invoice expired")
+            # An invoice paid just before it expired can still settle: re-check
+            time.sleep(60)
+            if w.invoices.get(invoice.number).status != "settled":
+                raise Exception("Invoice expired")
+            break
 
     return execute_task()
 ```
@@ -75,7 +85,7 @@ for await (const event of w.payments.watch(payment.number)) {
 ```
 
 ```python
-ln = LnBot(api_key="key_...")
+ln = LnBot(api_key="uk_...")
 w = ln.wallet("wal_...")
 
 # Pay BOLT11 invoice
@@ -112,7 +122,7 @@ app.post("/hooks/lnbot", (req, res) => {
 ```
 
 ```python
-ln = LnBot(api_key="key_...")
+ln = LnBot(api_key="uk_...")
 w = ln.wallet("wal_...")
 
 webhook = w.webhooks.create("https://example.com/hooks/lnbot")
@@ -136,7 +146,7 @@ const agent2 = await authed.wallets.create();
 // Store keys securely: account.primaryKey, account.recoveryPassphrase
 
 // Fund agents from coordinator wallet
-const coord = new LnBot({ apiKey: "key_coordinator..." });
+const coord = new LnBot({ apiKey: "uk_..." });
 const cw = coord.wallet("wal_coordinator...");
 await cw.payments.create({ target: agent1.address, amount: 10000 });
 await cw.payments.create({ target: agent2.address, amount: 10000 });
@@ -245,6 +255,8 @@ ln.restore.recovery(os.environ["WALLET_RECOVERY_PASSPHRASE"])
 ```
 
 **Don't skip idempotency in automated payments.** Without unique identifiers, retries may cause duplicate payments.
+
+**Don't hard-code `maxFee`.** It caps the network fee (0.25% plus routing) and defaults to 1% of the amount, min 20 sats. A fixed `maxFee: 10` rejects most payments above about 4,000 sats. Leave it unset, price the payment with `payments.resolve({ target, amount })` when the fee matters, and set `maxFee` only when the quote's `feeWarning` says the default is too low.
 
 **Don't hardcode amounts.** Accept amounts as parameters or configuration to avoid accidental overpayment.
 

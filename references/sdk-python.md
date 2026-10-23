@@ -94,6 +94,13 @@ w.payments.create(target="alice@ln.bot", amount=500)
 w.payments.create(target="lnbc1...")
 
 # List
+# Price a payment without sending (network fee estimate, service fee, total)
+quote = w.payments.resolve(target="alice@example.com", amount=500)
+# → .internal, .network_fee_estimate, .service_fee, .max_fee, .total, .fee_warning
+
+# Most the wallet can send to an address or LNURL now, after fees (omit amount)
+max_sendable = w.payments.resolve(target="alice@example.com").max_sendable
+
 payments = w.payments.list(limit=10, after="cursor")
 
 # Get
@@ -197,8 +204,7 @@ challenge = w.l402.create_challenge(
 # Pay challenge (client side)
 result = w.l402.pay(
     www_authenticate='L402 macaroon="...", invoice="lnbc..."',
-    max_fee=10,                   # optional
-    reference="order-42",         # optional
+    reference="order-42",         # optional (leave max_fee unset: defaults to 1%, min 20 sats)
     wait=True,                    # optional (default True)
     timeout=60,                   # optional
 )

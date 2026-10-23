@@ -69,7 +69,7 @@ let invoice = w.invoices().create(
 // Get
 let invoice = w.invoices().get(invoice_number).await?;
 
-// Watch (Stream-based SSE, requires wk_)
+// Watch (Stream-based SSE)
 use futures_util::StreamExt;
 use lnbot::InvoiceEventType;
 
@@ -112,10 +112,14 @@ w.payments().create(
     &CreatePaymentRequest::new("lnbc1...")
 ).await?;
 
-// Resolve (inspect target before paying)
-let res = w.payments().resolve("alice@ln.bot").await?;
+// Price a payment without sending (network fee estimate, service fee, total)
+let quote = w.payments().resolve_with_amount("alice@example.com", 500).await?;
+// → .internal, .network_fee_estimate, .service_fee, .max_fee, .total, .fee_warning
 
-// Watch (Stream-based SSE, requires wk_)
+// Resolve without an amount: limits, and for an address or LNURL .max_sendable
+let res = w.payments().resolve("alice@example.com").await?;
+
+// Watch (Stream-based SSE)
 use lnbot::PaymentEventType;
 
 let mut stream = w.payments().watch(payment.number, None);
@@ -163,7 +167,7 @@ w.webhooks().delete("webhook_id").await?;
 ## Events — `w.events()`
 
 ```rust
-// Stream all wallet events (SSE, requires wk_)
+// Stream all wallet events (SSE)
 let mut stream = w.events().stream();
 ```
 
@@ -221,7 +225,7 @@ let challenge = w.l402().create_challenge(&CreateL402ChallengeRequest {
 // Pay challenge (client side)
 let result = w.l402().pay(&PayL402Request {
     www_authenticate: challenge.www_authenticate,
-    max_fee: Some(10),
+    max_fee: None, // defaults to 1% of the amount, min 20 sats
     reference: None,
     wait: None,
     timeout: None,

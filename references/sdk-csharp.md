@@ -10,7 +10,7 @@ using LnBot;
 
 new LnBotClient()                                      // no auth (register/restore/public invoices)
 new LnBotClient("uk_...")                               // authenticated (user key)
-new LnBotClient("wk_...")                               // authenticated (wallet key — for SSE)
+new LnBotClient("wk_...")                               // authenticated (wallet key: one wallet only)
 new LnBotClient("uk_...", new LnBotClientOptions
 {
     BaseUrl = "https://api.ln.bot",                     // optional — default shown
@@ -77,7 +77,7 @@ var invoice = await w.Invoices.GetAsync(1);
 // Get by payment hash
 var invoice = await w.Invoices.GetByHashAsync("abc123...");
 
-// Watch for settlement (SSE stream — IAsyncEnumerable, requires wk_)
+// Watch for settlement (SSE stream — IAsyncEnumerable)
 await foreach (var evt in w.Invoices.WatchAsync(invoice.Number))
 {
     if (evt.Event == "settled") break;
@@ -113,13 +113,20 @@ await w.Payments.CreateAsync(new CreatePaymentRequest
 await w.Payments.CreateAsync(new CreatePaymentRequest { Target = "lnbc1..." });
 
 // List
+// Price a payment without sending (network fee estimate, service fee, total)
+var quote = await w.Payments.ResolveAsync("alice@example.com", 500);
+// → .Internal, .NetworkFeeEstimate, .ServiceFee, .MaxFee, .Total, .FeeWarning
+
+// Most the wallet can send to an address or LNURL now, after fees (omit amount)
+var maxSendable = (await w.Payments.ResolveAsync("alice@example.com")).MaxSendable;
+
 var payments = await w.Payments.ListAsync(new PaginationParams { Limit = 10 });
 
 // Get by number or payment hash
 var payment = await w.Payments.GetAsync(1);
 var payment = await w.Payments.GetByHashAsync("abc123...");
 
-// Watch for settlement (SSE stream — IAsyncEnumerable, requires wk_)
+// Watch for settlement (SSE stream — IAsyncEnumerable)
 await foreach (var evt in w.Payments.WatchAsync(payment.Number))
 {
     if (evt.Event == "settled") break;
@@ -163,7 +170,7 @@ await w.Webhooks.DeleteAsync("webhook_id");
 ## Events — `w.Events`
 
 ```csharp
-// Stream all wallet events (SSE, requires wk_)
+// Stream all wallet events (SSE)
 await foreach (var evt in w.Events.StreamAsync(cancellationToken))
 {
     Console.WriteLine($"{evt.Event}: {evt.Data}");
@@ -235,8 +242,7 @@ var challenge = await w.L402.CreateChallengeAsync(new CreateL402ChallengeRequest
 var result = await w.L402.PayAsync(new PayL402Request
 {
     WwwAuthenticate = challenge.WwwAuthenticate,
-    MaxFee = 10,                           // optional
-    Reference = "order-42",                // optional
+    Reference = "order-42",                // optional (leave MaxFee unset: defaults to 1%, min 20 sats)
     Wait = true,                           // optional — wait for settlement (default true)
     Timeout = 60,                          // optional — max seconds to wait
 });

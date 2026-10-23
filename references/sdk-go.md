@@ -74,7 +74,7 @@ invoices, err := w.Invoices.List(ctx, &lnbot.ListParams{Limit: lnbot.Ptr(10)})
 // Get by number
 invoice, err := w.Invoices.Get(ctx, number)
 
-// Watch (channel-based SSE, requires wk_)
+// Watch (channel-based SSE)
 events, errs := w.Invoices.Watch(ctx, invoice.Number, nil)
 for event := range events {
     if event.Event == "settled" {
@@ -107,8 +107,12 @@ _, err := w.Payments.Create(ctx, &lnbot.CreatePaymentParams{
     Amount: lnbot.Ptr(int64(500)),   // *int64, optional
 })
 
-// Resolve (inspect target before paying)
-res, err := w.Payments.Resolve(ctx, "alice@ln.bot")
+// Price a payment without sending (network fee estimate, service fee, total)
+quote, err := w.Payments.ResolveWithAmount(ctx, "alice@example.com", 500)
+// → .Internal, .NetworkFeeEstimate, .ServiceFee, .MaxFee, .Total, .FeeWarning (*int64 / *string)
+
+// Resolve without an amount: limits, and for an address or LNURL .MaxSendable
+res, err := w.Payments.Resolve(ctx, "alice@example.com")
 
 // List
 payments, err := w.Payments.List(ctx, &lnbot.ListParams{Limit: lnbot.Ptr(10)})
@@ -116,7 +120,7 @@ payments, err := w.Payments.List(ctx, &lnbot.ListParams{Limit: lnbot.Ptr(10)})
 // Get by number
 payment, err := w.Payments.Get(ctx, number)
 
-// Watch (channel-based SSE, requires wk_)
+// Watch (channel-based SSE)
 events, errs := w.Payments.Watch(ctx, payment.Number, nil)
 for event := range events {
     if event.Event == "settled" {
@@ -161,7 +165,7 @@ err = w.Webhooks.Delete(ctx, "webhook_id")
 ## Events — `w.Events`
 
 ```go
-// Stream all wallet events (SSE, requires wk_)
+// Stream all wallet events (SSE)
 events, errs := w.Events.Stream(ctx)
 ```
 
@@ -220,8 +224,7 @@ challenge, err := w.L402.CreateChallenge(ctx, &lnbot.CreateL402ChallengeParams{
 
 // Pay challenge (client side)
 result, err := w.L402.Pay(ctx, &lnbot.PayL402Params{
-    WwwAuthenticate: challenge.WwwAuthenticate,
-    MaxFee:          lnbot.Ptr(int64(10)),
+    WwwAuthenticate: challenge.WwwAuthenticate, // leave MaxFee nil: defaults to 1%, min 20 sats
 })
 // → .Authorization, .PaymentHash, .Preimage, .Amount, .Fee, .PaymentNumber, .Status
 

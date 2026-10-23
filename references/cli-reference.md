@@ -44,7 +44,6 @@ lnbot init                                    # Create local config file
 
 ```bash
 lnbot wallet create                           # Create wallet (name auto-generated)
-lnbot wallet create --name my-agent           # Create wallet with name
 lnbot wallet list                             # List wallets (alias: ls)
 lnbot wallet use <name|id>                    # Switch active wallet
 lnbot wallet rename <new-name>               # Rename active wallet
@@ -61,7 +60,7 @@ lnbot balance                                 # Show available and on-hold amoun
 ### invoice
 
 ```bash
-lnbot invoice create --amount 1000            # Create invoice for 1000 sats
+lnbot invoice create --amount 1000            # Create invoice for ₿1,000 (1,000 sats)
 lnbot invoice create --amount 1000 --memo "Payment for task"
 lnbot invoice create --amount 1000 --no-wait  # Don't wait for payment
 lnbot invoice list                            # List invoices (alias: ls)
@@ -77,11 +76,12 @@ lnbot invoice list --after 42                 # Pagination cursor
 lnbot pay alice@ln.bot --amount 500           # Pay Lightning address
 lnbot pay lnbc1...                            # Pay BOLT11 invoice
 lnbot pay lnurl1... --amount 500              # Pay LNURL
-lnbot pay alice@ln.bot --amount 500 --max-fee 10  # Set max routing fee (sats)
+lnbot pay alice@example.com --all             # Send everything the wallet can, after fees
 lnbot pay alice@ln.bot --amount 500 --no-wait # Don't wait for settlement
+lnbot pay alice@ln.bot --amount 500 --yes     # Skip the fee quote and the prompt
 ```
 
-Waits for settlement via SSE by default. Use `--no-wait` to return immediately.
+Before asking, `pay` prints the amount, the network fee estimate, the service fee and the total. Waits for settlement via SSE by default. Use `--no-wait` to return immediately. Leave `--max-fee` out: the network fee defaults to a cap of 1% of the amount (min 20 sats). Pass `--max-fee <sats>` only when `pay` reports the fee is above that cap. Requires CLI 1.1.0.
 
 ### payment
 

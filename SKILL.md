@@ -15,7 +15,7 @@ description: >-
 license: MIT
 metadata:
   author: lnbotdev
-  version: "1.1"
+  version: "1.2"
   homepage: https://ln.bot
   repository: https://github.com/lnbotdev/agent-skill
 ---
@@ -116,13 +116,13 @@ async with AsyncLnBot(api_key="uk_...") as ln:
 # Install
 brew install lnbotdev/tap/lnbot
 
-# Create wallet
-lnbot wallet create --name my-agent
+# Create an account and its first wallet
+lnbot init
 
 # Receive
-lnbot invoice --amount 1000 --memo "Task payment"
+lnbot invoice create --amount 1000 --memo "Task payment"
 
-# Send
+# Send (shows the fees and the total, then asks; --yes skips both)
 lnbot pay alice@ln.bot --amount 500
 
 # Balance
@@ -143,19 +143,24 @@ lnbot mcp config --remote
 
 Paste the generated JSON into your AI agent's MCP config (Claude Desktop, Cursor, etc.).
 
-MCP endpoint: `https://api.ln.bot/mcp` (auth: Bearer token)
+MCP endpoint: `https://api.ln.bot/v1/wallets/{walletId}/mcp` (auth: Bearer token)
 
 **Available tools:**
 
 | Tool | Description |
 |------|-------------|
 | `create_invoice` | Create Lightning invoice to receive sats. Returns bolt11, number, amount, expiry. |
-| `send_payment` | Send sats to Lightning address or BOLT11 invoice. Sends real money. |
+| `quote_payment` | Price a payment without sending it: network fee estimate, service fee, total. Omit `amount` for a Lightning address or LNURL to get the most the wallet can send there. Read-only. |
+| `send_payment` | Send sats to Lightning address, LNURL or BOLT11 invoice. Sends real money. Leave `maxFee` unset. |
 | `get_wallet` | Get balance, on-hold amount, available balance, and counts. |
 | `list_invoices` | List invoices (newest first), paginated. |
 | `list_payments` | List payments (newest first), paginated. |
 | `list_transactions` | List transaction history (newest first), paginated. |
 | `list_addresses` | List wallet's Lightning addresses. |
+| `buy_address` | Buy a vanity address (name@ln.bot) from the balance. |
+| `create_l402_challenge` | Create an L402 challenge (invoice + macaroon). |
+| `pay_l402_challenge` | Pay an L402 challenge and get the Authorization header. |
+| `verify_l402_token` | Verify an L402 token. |
 
 Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP — use SDK or CLI for those.
 
@@ -173,7 +178,7 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 **Recovery:** Every wallet has a 12-word BIP-39 passphrase. Store it securely — it's the only way to recover a wallet if keys are lost. Passkey (WebAuthn) backup also supported.
 
-**SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming on the wallet scope: `w.invoices.watch()` in TS/Python/Rust, `w.Invoices.Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`.
+**SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming on the wallet scope: `w.invoices.watch()` in TS/Python/Rust, `w.Invoices.Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`. An `expired` invoice is not always final: one paid just before it expired can still turn `settled`, so re-check it (`w.invoices.get()`) before treating it as unpaid. Payments that can't be routed yet stay `pending` and are retried, until the invoice expires or for 24 hours at most.
 
 **Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
 
@@ -188,11 +193,13 @@ L402 lets you gate API access behind Lightning micropayments. The flow:
 3. **Client** sends `Authorization: L402 <macaroon>:<preimage>` on subsequent requests
 4. **Server** verifies the token statelessly (signature + preimage + caveats)
 
+Verification is stateless, so a token stays valid until it expires. To charge per request, use the `@lnbot/l402` (Express) or `LnBot.L402.AspNetCore` paywall, version 1.1 or later: each token works once, on the route and at the price it was issued for. Calling the SDK directly, record each `paymentHash` you accept and refuse repeats.
+
 ```typescript
 import { LnBot } from "@lnbot/sdk";
 
 // Server side — create a challenge
-const ln = new LnBot({ apiKey: "key_server..." });
+const ln = new LnBot({ apiKey: "uk_..." });
 const w = ln.wallet("wal_...");
 
 const challenge = await w.l402.createChallenge({
@@ -204,7 +211,7 @@ const challenge = await w.l402.createChallenge({
 // challenge.wwwAuthenticate → send as WWW-Authenticate header in 402 response
 
 // Client side — pay the challenge
-const client = new LnBot({ apiKey: "key_client..." });
+const client = new LnBot({ apiKey: "uk_..." });
 const cw = client.wallet("wal_...");
 const result = await cw.l402.pay({
   wwwAuthenticate: challenge.wwwAuthenticate,
@@ -222,13 +229,13 @@ const verification = await w.l402.verify({
 from lnbot import LnBot
 
 # Server side
-ln = LnBot(api_key="key_server...")
+ln = LnBot(api_key="uk_...")
 w = ln.wallet("wal_...")
 challenge = w.l402.create_challenge(amount=100, description="API access", expiry_seconds=3600)
 # challenge.www_authenticate → send in 402 response
 
 # Client side
-client = LnBot(api_key="key_client...")
+client = LnBot(api_key="uk_...")
 cw = client.wallet("wal_...")
 result = cw.l402.pay(www_authenticate=challenge.www_authenticate)
 # result.authorization → send as Authorization header
@@ -238,15 +245,34 @@ verification = w.l402.verify(authorization=result.authorization)
 # verification.valid
 ```
 
-## Pricing
+## Pricing and fees
 
 | Route | Cost |
 |-------|------|
 | ln.bot → ln.bot | Free |
 | Lightning → ln.bot (receiving) | Free |
-| ln.bot → Lightning (sending) | 0.1% + network fee (min 1 sat) |
+| ln.bot → Lightning (sending) | 0.25% service fee (min 1 sat) + network fee (0.25% + routing) |
 
 No monthly fees. No hidden costs.
+
+**Leave `maxFee` unset.** It caps the network fee and defaults to 1% of the amount (min 20 sats). A hard-coded value like `10` rejects most payments above about 4,000 sats. While a payment is in flight only the fee estimate plus a small buffer is held; on success the wallet is debited `amount + actualFee + serviceFee`.
+
+**Price before paying.** `resolve` with an amount returns the fees without sending anything (MCP: `quote_payment`):
+
+```typescript
+const quote = await w.payments.resolve({ target: "alice@example.com", amount: 5000 });
+// quote.internal (true = ln.bot wallet, no fees), quote.networkFeeEstimate,
+// quote.serviceFee, quote.total, quote.feeWarning (set = fee unusually high)
+```
+
+**Send everything.** Resolve a Lightning address or LNURL without an amount, then pay `maxSendable` with no `maxFee`:
+
+```typescript
+const { maxSendable } = await w.payments.resolve({ target: "alice@example.com" });
+if (maxSendable) await w.payments.create({ target: "alice@example.com", amount: maxSendable });
+```
+
+Pricing a Lightning address or LNURL fetches an invoice from the recipient, so it is slower; call it once per payment, not in a loop. Requires SDK 1.1.0: Python `resolve(target=..., amount=...)`, Go `ResolveWithAmount`, Rust `resolve_with_amount`, C# `ResolveAsync(target, amount)`.
 
 ## Error handling
 

@@ -10,7 +10,7 @@ import { LnBot } from "@lnbot/sdk";
 
 new LnBot()                                    // no auth (register/restore/public invoices)
 new LnBot({ apiKey: "uk_..." })                // authenticated (user key)
-new LnBot({ apiKey: "wk_..." })                // authenticated (wallet key — for SSE)
+new LnBot({ apiKey: "wk_..." })                // authenticated (wallet key: one wallet only)
 new LnBot({
   apiKey: "uk_...",                            // optional
   baseUrl: "https://api.ln.bot",               // optional — default shown
@@ -66,7 +66,7 @@ const invoices = await w.invoices.list({ limit: 10, after: "cursor" });
 // Get by number or payment hash
 const invoice = await w.invoices.get("numberOrHash");
 
-// Watch for settlement (SSE stream — AsyncIterable, requires wk_)
+// Watch for settlement (SSE stream — AsyncIterable)
 for await (const event of w.invoices.watch(number, timeout, signal)) {
   if (event.event === "settled") break;
   if (event.event === "expired") throw new Error("expired");
@@ -88,8 +88,12 @@ await w.payments.create({ target: "alice@ln.bot", amount: 500 });
 // Pay BOLT11 invoice (amount encoded in invoice)
 await w.payments.create({ target: "lnbc1..." });
 
-// Resolve (inspect target without sending)
-const res = await w.payments.resolve({ target: "alice@ln.bot" });
+// Price a payment without sending (network fee estimate, service fee, total)
+const quote = await w.payments.resolve({ target: "alice@example.com", amount: 500 });
+// → { type, min, max, fixed, amount, internal, networkFeeEstimate, serviceFee, maxFee, total, maxSendable, feeWarning }
+
+// Most the wallet can send to an address or LNURL now, after fees (omit amount)
+const { maxSendable } = await w.payments.resolve({ target: "alice@example.com" });
 
 // List
 const payments = await w.payments.list({ limit: 10, after: "cursor" });
@@ -97,7 +101,7 @@ const payments = await w.payments.list({ limit: 10, after: "cursor" });
 // Get by number or hash
 const payment = await w.payments.get("numberOrHash");
 
-// Watch for settlement (SSE stream — AsyncIterable, requires wk_)
+// Watch for settlement (SSE stream — AsyncIterable)
 for await (const event of w.payments.watch(number, timeout, signal)) {
   if (event.event === "settled") break;
   if (event.event === "failed") throw new Error(event.data.failureReason);
@@ -134,7 +138,7 @@ await w.webhooks.delete("webhook_id");
 ## Events — `w.events`
 
 ```typescript
-// Stream all wallet events (SSE, requires wk_)
+// Stream all wallet events (SSE)
 const controller = new AbortController();
 for await (const event of w.events.stream(controller.signal)) {
   console.log(event.event, event.data);
@@ -198,8 +202,7 @@ const challenge = await w.l402.createChallenge({
 // Pay challenge (client side)
 const result = await w.l402.pay({
   wwwAuthenticate: "L402 macaroon=\"...\", invoice=\"lnbc...\"",
-  maxFee: 10,                    // optional
-  reference: "order-42",         // optional
+  reference: "order-42",         // optional (leave maxFee unset: defaults to 1%, min 20 sats)
   wait: true,                    // optional — wait for settlement (default true)
   timeout: 60,                   // optional — max seconds to wait
 });
