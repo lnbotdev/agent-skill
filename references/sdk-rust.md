@@ -28,6 +28,12 @@ let account = client.register().await?;
 
 // Identity
 let me = client.me().await?;
+
+// Service status (public, no key needed; 10 requests a minute per IP)
+let status = LnBot::unauthenticated().status().await?;
+// → .status: ServiceState (Operational, Degraded, Outage, Unknown, or Other(String)), .updated_at, .notice, .components
+let history = LnBot::unauthenticated().status_history("7d").await?; // "24h", "7d", "30d", "90d"
+// → .summary.uptime.overall.operational: Option<f64>, .buckets (samples 0: not measured), .notices
 ```
 
 ## Wallets — `client.wallets()`
@@ -118,6 +124,9 @@ let quote = w.payments().resolve_with_amount("alice@example.com", 500).await?;
 
 // Resolve without an amount: limits, and for an address or LNURL .max_sendable
 let res = w.payments().resolve("alice@example.com").await?;
+
+// A payment's stage (1.2.0): Option<PaymentStage> (Queued, Retrying, Sending, InFlight, Confirming, OnHold, Settled, Failed, Unknown)
+// .status_detail: Option<String>, show as is; .retry_until: set while retrying. Unknown or None: go by .status.
 
 // Watch (Stream-based SSE)
 use lnbot::PaymentEventType;
@@ -258,6 +267,7 @@ match w.invoices().get(999).await {
 | `LnBotError::BadRequest { body }` | 400 |
 | `LnBotError::NotFound { body }` | 404 |
 | `LnBotError::Conflict { body }` | 409 |
+| `LnBotError::Api { status: 429, body }` | 429: 10 requests a minute per IP on the public routes |
 
 ## Key imports
 

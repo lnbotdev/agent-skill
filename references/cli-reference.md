@@ -83,6 +83,8 @@ lnbot pay alice@ln.bot --amount 500 --yes     # Skip the fee quote and the promp
 
 Before asking, `pay` prints the amount, the network fee estimate, the service fee and the total. Waits for settlement via SSE by default. Use `--no-wait` to return immediately. Leave `--max-fee` out: the network fee defaults to a cap of 1% of the amount (min 20 sats). Pass `--max-fee <sats>` only when `pay` reports the fee is above that cap. Requires CLI 1.1.0.
 
+While it waits, `pay` (CLI 1.2.0) prints the payment's stage and a line each time it changes, such as `Retrying: Not sent yet; ... (until 14:43)`; `payment list` shows the stage of payments in progress (`Pending · retrying`). With `--json`, read `stage`, `statusDetail` and `retryUntil` from the payment instead.
+
 ### payment
 
 ```bash
@@ -113,8 +115,11 @@ lnbot address delete <address>                # Delete a Lightning address
 
 ```bash
 lnbot whoami                                  # Show current wallet info
-lnbot status                                  # Wallet status and API health
+lnbot status                                  # Service status, then wallet status and API health
+lnbot status --json                           # Adds "service" and "summary24h" to the wallet's keys
 ```
+
+`lnbot status` needs no key or wallet for the service part: the overall state, each part (sending, receiving, node, webhooks) with live numbers, any operators' notice, and the last 24 hours. It exits 0 whatever the service's state; only failing to reach the API (or a 429: 10 requests a minute per IP) is an error. Requires CLI 1.2.0.
 
 ### key
 

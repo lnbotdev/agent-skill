@@ -15,7 +15,7 @@ description: >-
 license: MIT
 metadata:
   author: lnbotdev
-  version: "1.2"
+  version: "1.3"
   homepage: https://ln.bot
   repository: https://github.com/lnbotdev/agent-skill
 ---
@@ -179,6 +179,10 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 **Recovery:** Every wallet has a 12-word BIP-39 passphrase. Store it securely — it's the only way to recover a wallet if keys are lost. Passkey (WebAuthn) backup also supported.
 
 **SSE streaming:** Watch invoice and payment status in real-time instead of polling. All SDKs support streaming on the wallet scope: `w.invoices.watch()` in TS/Python/Rust, `w.Invoices.Watch()` with channels in Go. Invoices emit `settled`/`expired`; payments emit `settled`/`failed`. An `expired` invoice is not always final: one paid just before it expired can still turn `settled`, so re-check it (`w.invoices.get()`) before treating it as unpaid. Payments that can't be routed yet stay `pending` and are retried, until the invoice expires or for 24 hours at most.
+
+**Payment stages:** a payment carries `stage`, where it is more precisely than `status` (`queued`, `retrying`, `sending`, `in_flight`, `confirming`, `on_hold`, `settled`, `failed`), and `statusDetail`, a sentence to show the user as is. A `retrying` payment also carries `retryUntil`: if it still can't be sent by then, it fails within about a minute and the funds are released. A payment can go back from `processing` to `pending` while it is retried, so treat both as in progress. More stages may be added: for one you don't know, go by `status`. The payment's event stream carries the same fields (snake_case on the wire); webhooks and the wallet event stream don't. Needs SDK 1.2.0 or CLI 1.2.0.
+
+**Service status:** `GET https://api.ln.bot/v1/status` (public, no key, 10 requests a minute per IP, 429 over it) says whether ln.bot has a problem right now; check it before blaming your own code for failed sends. `GET /v1/status/history?range=24h|7d|30d|90d` gives the same over time. SDKs: `status()` and `statusHistory()` on the client, no key needed. CLI: `lnbot status`. A person can look at https://ln.bot/status.
 
 **Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
 

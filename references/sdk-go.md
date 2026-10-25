@@ -30,6 +30,12 @@ account, err := client.Register(ctx)
 
 // Identity
 me, err := client.Me(ctx)
+
+// Service status (public, no key needed; 10 requests a minute per IP)
+status, err := lnbot.New("").Status(ctx)
+// → .Status (lnbot.ServiceOperational, ServiceDegraded, ServiceOutage, ServiceUnknown, or a newer value), .UpdatedAt, .Notice, .Components
+history, err := lnbot.New("").StatusHistory(ctx, &lnbot.StatusHistoryParams{Range: lnbot.StatusRange7d}) // nil params: 24h
+// → .Summary.Uptime.Overall.Operational (*float64), .Buckets (Samples 0: not measured), .Notices
 ```
 
 ## Wallets — `client.Wallets`
@@ -119,6 +125,8 @@ payments, err := w.Payments.List(ctx, &lnbot.ListParams{Limit: lnbot.Ptr(10)})
 
 // Get by number
 payment, err := w.Payments.Get(ctx, number)
+// payment.Stage: lnbot.PaymentStageQueued, PaymentStageRetrying, PaymentStageInFlight, ... or a newer value ("" from an older API)
+// payment.StatusDetail (*string, show as is), payment.RetryUntil (*time.Time, while retrying). Unknown or empty stage: go by payment.Status.
 
 // Watch (channel-based SSE)
 events, errs := w.Payments.Watch(ctx, payment.Number, nil)
@@ -253,6 +261,7 @@ if errors.As(err, &notFound) {
 | `*ForbiddenError` | 403 |
 | `*NotFoundError` | 404 |
 | `*ConflictError` | 409 |
+| `*TooManyRequestsError` | 429 (1.2.0) |
 | `*APIError` | base |
 
 ## Conventions

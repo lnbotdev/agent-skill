@@ -28,6 +28,12 @@ account = ln.register()
 
 # Identity
 me = ln.me()
+
+# Service status (public, no key needed; 10 requests a minute per IP)
+status = LnBot().status()
+# → .status ("operational", "degraded", "outage", "unknown" or a newer value), .updated_at, .notice, .components
+history = LnBot().status_history(range="7d")  # "24h" (default), "7d", "30d", "90d"
+# → .summary.uptime.overall.operational, .buckets (samples 0: not measured), .notices
 ```
 
 ## Wallets — `ln.wallets`
@@ -105,6 +111,8 @@ payments = w.payments.list(limit=10, after="cursor")
 
 # Get
 payment = w.payments.get("pay_number")
+# payment.stage: PaymentStage.QUEUED, RETRYING, SENDING, IN_FLIGHT, CONFIRMING, ON_HOLD, SETTLED, FAILED, or a newer value (None from an older API)
+# payment.status_detail: show as is; payment.retry_until: set while retrying. Unknown stage or None: go by payment.status.
 
 # Watch (sync)
 for event in w.payments.watch(payment.number, timeout=60):
@@ -232,6 +240,7 @@ except NotFoundError as e:
 | `UnauthorizedError` | 401 |
 | `NotFoundError` | 404 |
 | `ConflictError` | 409 |
+| `TooManyRequestsError` | 429 (1.2.0) |
 | `LnBotError` | base |
 
 ## Naming

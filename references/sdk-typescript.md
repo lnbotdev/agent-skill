@@ -27,6 +27,12 @@ const account = await ln.register();
 
 // Identity
 const me = await ln.me();
+
+// Service status (public, no key needed; 10 requests a minute per IP)
+const status = await new LnBot().status();
+// → { status: "operational" | "degraded" | "outage" | "unknown" | string, updatedAt, notice, components: { sending, receiving, node, webhooks } }
+const history = await new LnBot().statusHistory("7d"); // "24h" (default) | "7d" | "30d" | "90d"
+// → { range, bucketSeconds, from, to, summary: { uptime, sent, failed, medianSeconds, ... }, buckets, notices }
 ```
 
 ## Wallets — `ln.wallets`
@@ -100,6 +106,8 @@ const payments = await w.payments.list({ limit: 10, after: "cursor" });
 
 // Get by number or hash
 const payment = await w.payments.get("numberOrHash");
+// payment.stage: "queued" | "retrying" | "sending" | "in_flight" | "confirming" | "on_hold" | "settled" | "failed" | string
+// payment.statusDetail: show as is; payment.retryUntil: set while "retrying". Unknown stage or none: go by payment.status.
 
 // Watch for settlement (SSE stream — AsyncIterable)
 for await (const event of w.payments.watch(number, timeout, signal)) {
@@ -216,7 +224,7 @@ const v = await w.l402.verify({ authorization: "L402 <macaroon>:<preimage>" });
 ## Errors
 
 ```typescript
-import { LnBotError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } from "@lnbot/sdk";
+import { LnBotError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, TooManyRequestsError } from "@lnbot/sdk";
 
 try {
   await w.invoices.get("bad");
@@ -232,4 +240,5 @@ try {
 | `ForbiddenError` | 403 |
 | `NotFoundError` | 404 |
 | `ConflictError` | 409 |
+| `TooManyRequestsError` | 429 (1.2.0) |
 | `LnBotError` | base |

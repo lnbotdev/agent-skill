@@ -30,6 +30,13 @@ var account = await client.RegisterAsync();
 
 // Identity
 var me = await client.MeAsync();
+
+// Service status (public, no key needed; 10 requests a minute per IP)
+using var anon = new LnBotClient();
+var status = await anon.GetStatusAsync();
+// → .Status (ServiceState.Operational, Degraded, Outage, Unknown, or a newer string), .UpdatedAt, .Notice, .Components
+var history = await anon.GetStatusHistoryAsync(StatusRange.Last7Days); // "24h" (default), "7d", "30d", "90d"
+// → .Summary.Uptime.Overall.Operational (double?), .Buckets (Samples 0: not measured), .Notices
 ```
 
 ## Wallets — `client.Wallets`
@@ -125,6 +132,8 @@ var payments = await w.Payments.ListAsync(new PaginationParams { Limit = 10 });
 // Get by number or payment hash
 var payment = await w.Payments.GetAsync(1);
 var payment = await w.Payments.GetByHashAsync("abc123...");
+// payment.Stage (string?): PaymentStage.Queued, Retrying, Sending, InFlight, Confirming, OnHold, Settled, Failed, or a newer value
+// payment.StatusDetail: show as is; payment.RetryUntil: set while retrying. Unknown stage or null: go by payment.Status.
 
 // Watch for settlement (SSE stream — IAsyncEnumerable)
 await foreach (var evt in w.Payments.WatchAsync(payment.Number))
@@ -278,6 +287,7 @@ catch (NotFoundException ex)
 | `ForbiddenException` | 403 |
 | `NotFoundException` | 404 |
 | `ConflictException` | 409 |
+| `TooManyRequestsException` | 429 (1.2.0) |
 | `LnBotException` | base |
 
 ## Conventions
