@@ -256,7 +256,7 @@ ln.restore.recovery(os.environ["WALLET_RECOVERY_PASSPHRASE"])
 
 **Don't skip idempotency in automated payments.** Without unique identifiers, retries may cause duplicate payments.
 
-**Don't hard-code `maxFee`.** It caps the network fee (0.25% plus routing) and defaults to 1% of the amount, min 20 sats. A fixed `maxFee: 10` rejects most payments above about 4,000 sats. Leave it unset, price the payment with `payments.resolve({ target, amount })` when the fee matters, and set `maxFee` only when the quote's `feeWarning` says the default is too low.
+**Don't hard-code `maxFee`.** It caps the network fee (the routing; the 0.25% service fee is separate) and defaults to 1% of the amount, min 20 sats. A fixed `maxFee: 10` rejects most payments above about 4,000 sats. Leave it unset, price the payment with `payments.resolve({ target, amount })` when the fee matters, and set `maxFee` only when the quote's `feeWarning` says the default is too low.
 
 **Don't hardcode amounts.** Accept amounts as parameters or configuration to avoid accidental overpayment.
 

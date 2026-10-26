@@ -255,11 +255,11 @@ verification = w.l402.verify(authorization=result.authorization)
 |-------|------|
 | ln.bot → ln.bot | Free |
 | Lightning → ln.bot (receiving) | Free |
-| ln.bot → Lightning (sending) | 0.25% service fee (min 1 sat) + network fee (0.25% + routing) |
+| ln.bot → Lightning (sending) | 0.25% service fee (min 1 sat) + network fee (routing) |
 
 No monthly fees. No hidden costs.
 
-**Leave `maxFee` unset.** It caps the network fee and defaults to 1% of the amount (min 20 sats). A hard-coded value like `10` rejects most payments above about 4,000 sats. While a payment is in flight only the fee estimate plus a small buffer is held; on success the wallet is debited `amount + actualFee + serviceFee`.
+**Leave `maxFee` unset.** It caps the network fee (the routing; the service fee is separate) and defaults to 1% of the amount (min 20 sats). A hard-coded value like `10` rejects most payments above about 4,000 sats. While a payment is in flight only the fee estimate plus a small buffer is held; on success the wallet is debited `amount + actualFee + serviceFee`.
 
 **Price before paying.** `resolve` with an amount returns the fees without sending anything (MCP: `quote_payment`):
 
