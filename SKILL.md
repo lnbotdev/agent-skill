@@ -184,7 +184,7 @@ Wallet creation, key rotation, webhooks, backup/restore are not exposed via MCP 
 
 **Service status:** `GET https://api.ln.bot/v1/status` (public, no key, 10 requests a minute per IP, 429 over it) says whether ln.bot has a problem right now; check it before blaming your own code for failed sends. `GET /v1/status/history?range=24h|7d|30d|90d` gives the same over time. SDKs: `status()` and `statusHistory()` on the client, no key needed. CLI: `lnbot status`. A person can look at https://ln.bot/status.
 
-**Webhooks:** Register HTTP endpoints to receive POST notifications on invoice settlement. Max 10 per wallet. Each webhook has a secret for signature verification.
+**Webhooks:** Register HTTPS endpoints to receive a POST for every wallet event (`invoice.created`, `invoice.settled`, `payment.created`, `payment.settled`, `payment.failed`). Max 10 per wallet, one per URL. The secret (64 hex chars, returned once) signs each delivery: `X-Webhook-Signature: sha256=<hex HMAC-SHA256 of the raw body>`, keyed with the hex-decoded secret bytes, not the hex text. The body is `{ event, created_at, data }` with snake_case keys. Failed deliveries are retried up to 10 times over ~8 hours, so deliveries can repeat or arrive out of order: dedupe on `event` + `data.number`. Deliveries don't name the wallet, so put the wallet ID in the URL when one endpoint serves several wallets.
 
 **L402 (HTTP 402 paywalls):** Monetize APIs with Lightning-native authentication. Create challenges (invoice + macaroon), verify tokens statelessly, or pay challenges to get Authorization headers. All SDKs expose L402 on the wallet scope: `w.l402.createChallenge()`, `w.l402.verify()`, and `w.l402.pay()`.
 
